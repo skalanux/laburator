@@ -4,15 +4,32 @@ CLI job-search assistant powered by LangGraph. Fetches job listings via API, pro
 
 ## Installation
 
+### From PyPI (recommended)
+
 ```bash
-# Clone the repo
+# With pip
+pip install laburator
+
+# With uv
+uv pip install laburator
+
+# Or install as a standalone tool (uv only, isolates dependencies)
+uv tool install laburator
+
+# Verify it works
+laburator --help
+```
+
+### From source (development)
+
+```bash
 git clone <repo-url>
 cd laburator
 
-# Install with pip (editable, recommended)
+# With pip
 pip install -e .
 
-# Or with uv
+# With uv
 uv pip install -e .
 
 # Verify it works
