@@ -1,0 +1,77 @@
+# Carlos Méndez
+
+**Senior Python Developer** | Buenos Aires, Argentina  
+carlos.mendez@email.com | +54 11 5555-1234  
+github.com/cmendez | linkedin.com/in/cmendez
+
+---
+
+## Resumen
+
+Senior Python Developer con 8+ años de experiencia diseñando y manteniendo sistemas backend escalables. Especializado en Django, FastAPI, y arquitecturas de microservicios. Experiencia liderando equipos de 3-5 desarrolladores, migrando sistemas monolíticos a arquitecturas basadas en eventos, y reduciendo costos de infraestructura en un 40% mediante optimización de consultas y caching.
+
+---
+
+## Experiencia
+
+### TechFlow Solutions — *Senior Backend Developer*
+*Mar 2021 – Presente | Buenos Aires, Argentina*
+
+- Diseñé e implementé una API REST para procesamiento de pagos en tiempo real usando FastAPI + PostgreSQL, manejando 500+ requests/segundo con 99.9% uptime.
+- Migré 12 microservicios de una arquitectura monolítica a un sistema basado en eventos con RabbitMQ y Redis, reduciendo el tiempo de deploy en un 60%.
+- Lideré un equipo de 4 desarrolladores junior, implementando code reviews obligatorios, CI/CD con GitHub Actions, y cobertura de tests >85%.
+- Optimicé consultas SQL que redujeron el tiempo de respuesta de endpoints críticos de 3 segundos a 120ms.
+- Introduje Docker y Kubernetes para estandarizar entornos de desarrollo, eliminando errores de "funciona en mi máquina".
+
+### DataBridge Systems — *Python Developer*
+*Jun 2018 – Feb 2021 | Buenos Aires, Argentina*
+
+- Desarrollé ETLs en Python procesando 2M+ registros/día usando Pandas y Apache Airflow.
+- Construí una API GraphQL con Django + graphene para un dashboard de analytics usado por 200+ clientes.
+- Implementé autenticación OAuth2 con JWT y refresh tokens para un sistema multi-tenant.
+- Reduje el tiempo de ejecución de reportes mensuales de 4 horas a 15 minutos mediante parallel processing y caching.
+
+### StartUp Labs — *Junior Developer*
+*Ene 2016 – May 2018 | Buenos Aires, Argentina*
+
+- Desarrollé features full-stack con Django + Bootstrap para una plataforma SaaS de recursos humanos.
+- Migré la base de datos de SQLite a PostgreSQL con zero downtime.
+- Escribí tests unitarios y de integración con pytest, alcanzando 70% de cobertura.
+- Colaboré en la migración del frontend de jQuery a React.
+
+---
+
+## Educación
+
+### Universidad de Buenos Aires
+**Ingeniería en Informática** | 2011 – 2016
+
+### Certificaciones
+- AWS Solutions Architect – Associate (2023)
+- Docker Certified Associate (2022)
+
+---
+
+## Habilidades Técnicas
+
+| Categoría | Tecnologías |
+|-----------|-------------|
+| **Lenguajes** | Python, TypeScript, SQL, Bash |
+| **Frameworks** | Django, FastAPI, Flask, DRF, pytest |
+| **Bases de Datos** | PostgreSQL, Redis, MongoDB, Elasticsearch |
+| **Infraestructura** | Docker, Kubernetes, AWS (EC2, RDS, SQS), Terraform |
+| **Herramientas** | Git, GitHub Actions, RabbitMQ, Apache Airflow, Prometheus |
+
+---
+
+## Idiomas
+
+- **Español:** Nativo
+- **Inglés:** Avanzado (C1) — lectura técnica, conversación fluida, writing
+
+---
+
+## Proyectos Destacados
+
+- **OpenPayment** — Librería open-source de integración con Mercado Pago para Django. 500+ estrellas en GitHub.
+- **LogLens** — Herramienta CLI para parsing y análisis de logs en tiempo real. Desarrollada en Python con asyncio.
