@@ -14,6 +14,7 @@ import typer
 
 from laburator.config import LaburatorConfig
 from laburator.pipeline import JobSearchPipeline
+from laburator.skills import build_user_messages, load_skill, response_format
 
 logger = logging.getLogger(__name__)
 
@@ -123,22 +124,21 @@ def run(
     pipeline = JobSearchPipeline(config)
 
     try:
-        skill_module = __import__(f"skills.{skill}", fromlist=[skill])
-        system_prompt = skill_module.SYSTEM_PROMPT
-        user_messages = skill_module.build_prompt(job, cv_context, wiki_context)
-        response_format = "json_object" if skill == "jobsynthesis" else "text"
+        system_prompt = load_skill(skill)
+        user_messages = build_user_messages(skill, job, cv_context, wiki_context)
+        fmt = response_format(skill)
 
         result_text = asyncio.run(
             pipeline.llm.generate(
                 system_prompt=system_prompt,
                 user_messages=user_messages,
-                response_format=response_format,
+                response_format=fmt,
             )
         )
 
         typer.echo(result_text)
 
-    except ImportError:
+    except FileNotFoundError:
         typer.echo(
             f"Unknown skill '{skill}'. Available: createcv, presentationletter, "
             f"interviewquestions, jobsynthesis",

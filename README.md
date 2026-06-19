@@ -75,6 +75,28 @@ The CV supports any markdown content — sections like Summary, Experience, Educ
 
 If you have reference knowledge — technical notes, company background, industry research — you can place `.md` files in `~/Proyectos/llmwiki/wiki/` (or the path configured as `LLMWIKI_DIR` in `.env`). These files are loaded and injected into every skill prompt as supplementary context, giving the LLM more relevant background to work with.
 
+### Skills (custom prompts)
+
+Skills are **markdown files** containing the system prompt for each LLM call. Built-in skills ship with the package:
+
+| File | Generates |
+|------|-----------|
+| `jobsynthesis.md` | Job analysis |
+| `createcv.md` | Tailored CV |
+| `presentationletter.md` | Cover letter |
+| `interviewquestions.md` | Interview Q&A |
+
+To customise a skill, create `~/.config/laburator/skills/<name>.md` with the same filename — it will take precedence over the built-in. For example:
+
+```bash
+mkdir -p ~/.config/laburator/skills
+# Override the CV prompt
+cp src/laburator/skills/createcv.md ~/.config/laburator/skills/
+# Now edit ~/.config/laburator/skills/createcv.md to your liking
+```
+
+Every skill call receives the job listing (JSON), your CV, and the wiki knowledge base as context automatically.
+
 ## Output
 
 Results are saved under `~/.local/share/laburator/output/`, organized by date:

@@ -5,11 +5,9 @@ context-loading, LLM processing, and output-saving nodes.
 """
 from __future__ import annotations
 
-import importlib
 import json
 import logging
 import re
-import sys
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -19,14 +17,17 @@ from langgraph.graph import END, START, StateGraph
 from laburator.api.client import JobSearchClient
 from laburator.config import LaburatorConfig
 from laburator.llm.service import LLMService
+from laburator.skills import (
+    SKILL_FILENAMES,
+    SKILL_LABELS,
+    SKILL_NAMES,
+    build_user_messages,
+    load_skill,
+    response_format,
+)
 from laburator.state import State
 
 logger = logging.getLogger(__name__)
-
-# Ensure project root is on sys.path so skills/ can be imported
-_project_root = Path(__file__).resolve().parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
 
 
 def _slugify(text: str) -> str:
@@ -77,7 +78,7 @@ class JobSearchPipeline:
         if not query:
             return {"errors": state.get("errors", []) + ["No query provided"]}
 
-        print(f"\n🔍 Buscando trabajos para '{query}'...", end=" ", flush=True)
+        print(f"\n🔍 Searching for '{query}'...", end=" ", flush=True)
         try:
             response = await self.api.search_v2(
                 query=query,
@@ -86,10 +87,10 @@ class JobSearchPipeline:
                 remote_jobs_only=state.get("remote_only", False),
             )
             jobs = [job.model_dump() for job in response.data]
-            print(f"{len(jobs)} trabajo(s) encontrados ✓", flush=True)
+            print(f"{len(jobs)} job(s) found ✓", flush=True)
             return {"all_jobs": jobs}
         except Exception as exc:
-            print(f"falló ✗", flush=True)
+            print(f"failed ✗", flush=True)
             logger.exception("Failed to fetch jobs for query '%s'", query)
             return {"errors": state.get("errors", []) + [f"Fetch failed: {exc}"]}
 
@@ -100,7 +101,7 @@ class JobSearchPipeline:
         if not jobs:
             return {}
 
-        print("💾 Guardando caché...", end=" ", flush=True)
+        print("💾 Saving cache...", end=" ", flush=True)
         cache_dir = self.config.resolved_output_dir / "cache" / _slugify(query)
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_path = cache_dir / "jobs.json"
@@ -112,7 +113,7 @@ class JobSearchPipeline:
             print(f"✓", flush=True)
             logger.info("Cached %d jobs to %s", len(jobs), cache_path)
         except Exception as exc:
-            print(f"falló: {exc}", flush=True)
+            print(f"failed: {exc}", flush=True)
             logger.warning("Failed to cache jobs: %s", exc)
 
         return {}  # No state mutation needed
@@ -127,12 +128,12 @@ class JobSearchPipeline:
         if cv_path.exists():
             try:
                 cv_context = cv_path.read_text(encoding="utf-8")
-                print(f"📄 CV cargado ({len(cv_context)} chars)", flush=True)
+                print(f"📄 CV loaded ({len(cv_context)} chars)", flush=True)
                 logger.info("Loaded CV from %s (%d chars)", cv_path, len(cv_context))
             except Exception as exc:
                 logger.warning("Failed to read CV at %s: %s", cv_path, exc)
         else:
-            print("⚠️  cv.md no encontrado — los skills se generarán sin contexto personal", flush=True)
+            print("⚠️  cv.md not found — skills will run without personal context", flush=True)
 
         # Load LLM wiki content
         wiki_dir = self.config.resolved_llmwiki_dir
@@ -147,10 +148,10 @@ class JobSearchPipeline:
                 except Exception as exc:
                     logger.warning("Failed to read %s: %s", md_file, exc)
             llmwiki_context = "\n\n---\n\n".join(parts)
-            print(f"📚 Wiki cargada: {len(md_files)} página(s) ({len(llmwiki_context)} chars)", flush=True)
+            print(f"📚 Wiki loaded: {len(md_files)} page(s) ({len(llmwiki_context)} chars)", flush=True)
             logger.info("Loaded %d wiki pages (%d chars)", len(md_files), len(llmwiki_context))
         else:
-            print(f"⚠️  Directorio llmwiki no encontrado: {wiki_dir}", flush=True)
+            print(f"⚠️  LLM wiki directory not found: {wiki_dir}", flush=True)
 
         return {
             "cv_context": cv_context,
@@ -165,20 +166,7 @@ class JobSearchPipeline:
         errors: list[str] = list(state.get("errors", []))
         outputs: dict[str, str] = dict(state.get("outputs", {}))
 
-        skill_names = [
-            "jobsynthesis",
-            "createcv",
-            "presentationletter",
-            "interviewquestions",
-        ]
-        skill_labels = {
-            "jobsynthesis": "📋 Análisis del trabajo",
-            "createcv": "📄 CV personalizado",
-            "presentationletter": "✉️ Carta de presentación",
-            "interviewquestions": "❓ Preguntas de entrevista",
-        }
-
-        total = len(jobs) * len(skill_names)
+        total = len(jobs) * len(SKILL_NAMES)
         completed = 0
 
         for job_idx, job in enumerate(jobs):
@@ -186,21 +174,20 @@ class JobSearchPipeline:
             job_title = job.get("job_title", "unknown")
             print(f"\n  [{job_idx + 1}/{len(jobs)}] {job_title} @ {employer}", flush=True)
 
-            for skill_name in skill_names:
-                label = skill_labels.get(skill_name, skill_name)
+            for skill_name in SKILL_NAMES:
+                label = SKILL_LABELS.get(skill_name, skill_name)
                 completed += 1
                 print(f"    ⏳ {label}... ({completed}/{total})", end="", flush=True)
 
                 try:
-                    skill_module = importlib.import_module(f"skills.{skill_name}")
-                    system_prompt = skill_module.SYSTEM_PROMPT
-                    user_messages = skill_module.build_prompt(job, cv_ctx, wiki_ctx)
-                    response_format = "json_object" if skill_name == "jobsynthesis" else "text"
+                    system_prompt = load_skill(skill_name)
+                    user_messages = build_user_messages(skill_name, job, cv_ctx, wiki_ctx)
+                    fmt = response_format(skill_name)
 
                     result = await self.llm.generate(
                         system_prompt=system_prompt,
                         user_messages=user_messages,
-                        response_format=response_format,
+                        response_format=fmt,
                     )
 
                     output_key = f"{job_idx}_{skill_name}"
@@ -212,7 +199,7 @@ class JobSearchPipeline:
                     self._save_individual_output(run_date, job, skill_name, result)
 
                 except Exception as exc:
-                    print(f"\r    ❌ {label} — falló: {exc}     ", flush=True)
+                    print(f"\r    ❌ {label} — failed: {exc}     ", flush=True)
                     msg = f"Skill '{skill_name}' failed for job {job_idx}: {exc}"
                     logger.exception(msg)
                     errors.append(msg)
@@ -245,17 +232,10 @@ class JobSearchPipeline:
             saved += 1
 
         if saved:
-            print(f"\n💾 {saved} archivo(s) guardados en {output_root}", flush=True)
+            print(f"\n💾 {saved} file(s) saved to {output_root}", flush=True)
         return {"errors": errors}
 
     # ── Output helpers ──────────────────────────────────────────────────
-
-    SKILL_FILENAMES = {
-        "jobsynthesis": "job",
-        "createcv": "cv",
-        "presentationletter": "presentation",
-        "interviewquestions": "interview",
-    }
 
     def _save_individual_output(
         self, run_date: str, job: dict, skill_name: str, content: str,
@@ -263,7 +243,7 @@ class JobSearchPipeline:
         """Write a single skill output to disk immediately."""
         company_slug = _slugify(job.get("employer_name", "unknown"))
         job_slug = _slugify(job.get("job_title", "unknown"))
-        filename = self.SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
+        filename = SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
         out_dir = self.config.resolved_output_dir / run_date / f"{company_slug}-{job_slug}"
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / filename
