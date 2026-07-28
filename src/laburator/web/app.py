@@ -169,17 +169,19 @@ async def generate(request: GenerateRequest):
 
 
 @app.get("/api/outputs")
-async def list_outputs(limit: int = Query(20, ge=1, le=100)):
-    """List recently generated output files (manual entries)."""
+async def list_outputs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(15, ge=1, le=50),
+):
+    """List recently generated output files (manual entries), paginated."""
     out_dir = config.resolved_output_dir
-    files: list[dict[str, Any]] = []
-    # Search for all .md files in any /manual/ subdirectory
+    all_files: list[dict[str, Any]] = []
     for f in sorted(
         out_dir.rglob("**/manual/*.md"), key=lambda p: p.stat().st_mtime, reverse=True
     ):
         if f.is_file():
             rel = str(f.relative_to(config.resolved_output_dir))
-            files.append(
+            all_files.append(
                 {
                     "filename": f.name,
                     "rel_path": rel,
@@ -188,10 +190,17 @@ async def list_outputs(limit: int = Query(20, ge=1, le=100)):
                     "modified": f.stat().st_mtime,
                 }
             )
-            if len(files) >= limit:
-                break
-
-    return JSONResponse({"files": files})
+    total = len(all_files)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    files_page = all_files[start : start + page_size]
+    return JSONResponse({
+        "files": files_page,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    })
 
 
 @app.get("/api/file/{filepath:path}")
