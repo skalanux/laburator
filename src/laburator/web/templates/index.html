@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laburator - Generador Rápido</title>
+    <title>Laburator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
@@ -39,44 +40,124 @@
         .tab-content.active { display: block; }
         .cv-status { font-size: 12px; margin-left: 12px; }
         .cv-status.exists { color: #16a34a; }
-        .cv-status.missing { color: #dc2626; }
+        .cv-status.missing { color: #dc2626;         }
+        .disclosure {
+            cursor: pointer;
+            font-size: 10px;
+            user-select: none;
+            display: inline-block;
+            transition: transform 0.2s;
+            color: #6b7280;
+        }
+        .disclosure.open {
+            transform: rotate(90deg);
+        }
+        .job-md-panel {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 4px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .job-md-panel pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .modal-close:hover {
+            color: #111;
+        }
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-body pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .modal-body.loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            color: #6b7280;
+        }
     </style>
 </head>
 <body>
     <h1>🛠️ Laburator — Entradas Manuales</h1>
 
     <div class="tabs">
-        <button class="tab-btn active" data-tab="cv">📄 Mi CV</button>
-        <button class="tab-btn" data-tab="generator">⚡ Generar</button>
-    </div>
-
-    <!-- ── Tab: CV ─────────────────────────────────────── -->
-    <div id="tab-cv" class="tab-content active">
-        <div class="card">
-            <h2>Curriculum Vitae</h2>
-            <p>Este CV se usa como contexto al generar contenidos.</p>
-            <div class="path" id="cvPath"></div>
-            <textarea id="cvEditor" class="output-editor" placeholder="Escribí tu CV en markdown..."></textarea>
-            <div class="action-bar">
-                <button class="btn-save" onclick="saveCv()">💾 Guardar CV</button>
-                <span id="cvStatus" class="success-msg" style="display:none;"></span>
-            </div>
-        </div>
+        <button class="tab-btn active" data-tab="generator">⚡ Generar</button>
+                <button class="tab-btn" data-tab="cv"><i class="fa-regular fa-file-lines"></i> Mi CV</button>
     </div>
 
     <!-- ── Tab: Generator ──────────────────────────────── -->
-    <div id="tab-generator" class="tab-content">
+    <div id="tab-generator" class="tab-content active">
         <div class="card">
             <h2>Generar</h2>
             <label for="jobDescription">Job Description (todo el texto)</label>
             <textarea id="jobDescription" placeholder="Pega aquí el completo job description..."></textarea>
 
-            <label for="skill">Skill a aplicar</label>
+            <label for="jobLink">Link (opcional) <span style="font-weight:400;color:#6b7280;">— se usará como carpeta para agrupar generados</span></label>
+            <input id="jobLink" type="text" placeholder="Ej: linkedin.com/jobs/view/12345 o el nombre que quieras" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+
+            <label for="skill" style="margin-top:16px;">Skill a aplicar</label>
             <select id="skill">
-                <option value="jobsynthesis">📋 Análisis de puesto</option>
-                <option value="createcv">📄 CV personalizado con análisis ats</option>
-                <option value="presentationletter">✉️ Carta de presentación</option>
-                <option value="interviewquestions">❓ Preguntas de entrevista</option>
+                <option value="jobsynthesis">Análisis de puesto</option>
+                <option value="createcv">CV personalizado con análisis ATS</option>
+                <option value="presentationletter">Carta de presentación</option>
+                <option value="interviewquestions">Preguntas de entrevista</option>
             </select>
 
             <button id="generateBtn" onclick="generate()" style="margin-top: 12px;">Generar</button>
@@ -86,7 +167,7 @@
                 <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
                 <div class="action-bar">
                     <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
-                    <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
+                    <button id="pdfBtn" class="btn-pdf" onclick="openPdf()"><i class="fa-regular fa-file-pdf"></i> PDF</button>
                     <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
                     <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
                     <span id="saveStatus" class="success-msg" style="display:none;"></span>
@@ -100,6 +181,20 @@
             <div class="path" id="outputDirPath"></div>
             <ul class="file-list" id="fileList"></ul>
             <div class="pagination" id="pagination" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; justify-content: center;"></div>
+        </div>
+    </div>
+
+    <!-- ── Tab: CV ─────────────────────────────────────── -->
+    <div id="tab-cv" class="tab-content">
+        <div class="card">
+            <h2>Curriculum Vitae</h2>
+            <p>Este CV se usa como contexto al generar contenidos.</p>
+            <div class="path" id="cvPath"></div>
+            <textarea id="cvEditor" class="output-editor" placeholder="Escribí tu CV en markdown..."></textarea>
+            <div class="action-bar">
+                <button class="btn-save" onclick="saveCv()">💾 Guardar CV</button>
+                <span id="cvStatus" class="success-msg" style="display:none;"></span>
+            </div>
         </div>
     </div>
 
@@ -164,6 +259,7 @@
         async function generate() {
             const jobDesc = document.getElementById('jobDescription').value.trim();
             const skill = document.getElementById('skill').value;
+            const link = document.getElementById('jobLink').value.trim();
 
             if (!jobDesc) {
                 alert("Por favor, pega un job description.");
@@ -183,7 +279,7 @@
                 const res = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ job_description: jobDesc, skill: skill })
+                    body: JSON.stringify({ job_description: jobDesc, skill: skill, link: link })
                 });
 
                 if (!res.ok) {
@@ -199,8 +295,8 @@
 
                 document.getElementById('fileBadge').textContent = data.filename;
 
-                const link = document.getElementById('downloadLink');
-                link.href = '/api/file/' + encodeURIComponent(data.rel_path);
+                const downloadElem = document.getElementById('downloadLink');
+                downloadElem.href = '/api/file/' + encodeURIComponent(data.rel_path);
 
                 clearStatus();
             } catch (e) {
@@ -268,31 +364,83 @@
         let currentPage = 1;
         const PAGE_SIZE = 15;
 
+        function toggleJobMd(id) {
+            const panel = document.getElementById('md-' + id);
+            const disc = document.getElementById('disc-' + id);
+            if (!panel) return;
+            const isOpen = panel.style.display !== 'none';
+            panel.style.display = isOpen ? 'none' : 'block';
+            if (disc) disc.classList.toggle('open', !isOpen);
+        }
+
         async function refreshFiles() {
             const res = await fetch(`/api/outputs?page=${currentPage}&page_size=${PAGE_SIZE}`);
             const data = await res.json();
             const list = document.getElementById('fileList');
             list.innerHTML = '';
 
-            if (!data.files || data.files.length === 0) {
+            if (!data.folders || data.folders.length === 0) {
                 list.innerHTML = '<li style="color:#6b7280; padding:12px;">No hay archivos generados aún.</li>';
                 document.getElementById('pagination').innerHTML = '';
                 return;
             }
 
-            data.files.forEach(file => {
+            data.folders.forEach(folder => {
                 const li = document.createElement('li');
                 li.className = 'file-item';
-                const relPath = file.rel_path.split('/').pop();
-                const dateStr = new Date(file.modified * 1000).toLocaleDateString();
+                const dateStr = new Date(folder.modified * 1000).toLocaleDateString();
+                let skillsHtml = '';
+
+
+                // Other skill files
+                folder.skills.forEach((sk, i) => {
+                    const baseName = sk.filename.replace('.md', '');
+                    const icon = baseName === 'presentation' ? 'fa-envelope' : baseName === 'cv' ? 'fa-file-lines' : baseName === 'interview' ? 'fa-circle-question' : baseName === 'jobsynthesis' ? 'fa-clipboard' : 'fa-file-lines';
+                    skillsHtml += `
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="display:inline-flex; align-items:center; gap:4px; min-width:200px;">
+                                <i class="fa-regular ${icon}"></i> ${baseName}
+                            </span>
+                            <a href="javascript:void(0)" onclick="showFileModal('${sk.rel_path}')" style="font-size:12px;"><i class="fa-regular fa-eye"></i></a>
+                            <a href="/api/file/${encodeURIComponent(sk.rel_path)}?download=true" style="font-size:12px;"><i class="fa-solid fa-download"></i></a>
+                            <a href="/api/pdf/${encodeURIComponent(sk.rel_path)}" target="_blank" style="font-size:12px;"><i class="fa-regular fa-file-pdf"></i></a>
+                        </div>
+                    `;
+                });
+
+                const liId = `folder-${folder.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                const hasMd = folder.job_md_content || false;
+
+                let linkLine = '';
+                if (folder.link) {
+                    linkLine = `<div style="font-size:12px; word-break:break-all;">
+                        <i class="fa-solid fa-link" style="color:#6b7280;"></i> <a href="${folder.link}" target="_blank" style="color:#2563eb;">${folder.link}</a>
+                    </div>`;
+                }
+                if (hasMd) {
+                    linkLine += `
+                        <div style="font-size:12px; margin-top:2px;">
+                            <span class="disclosure" onclick="toggleJobMd('${liId}')" id="disc-${liId}"><i class="fa-solid fa-chevron-right"></i></span>
+                            <span class="disclosure" onclick="toggleJobMd('${liId}')" style="cursor:pointer; color:#6b7280;">ver detalle</span>
+                        </div>
+                    `;
+                }
+
+                const mdPanel = hasMd
+                    ? `<div id="md-${liId}" class="job-md-panel" style="display:none;"><pre>${folder.job_md_content}</pre></div>`
+                    : '';
+
                 li.innerHTML = `
-                    <div>
-                        <strong>${relPath}</strong> • ${dateStr} • ${file.size} bytes
-                    </div>
-                    <div>
-                        <a href="/api/file/${encodeURIComponent(file.rel_path)}" target="_blank">Ver</a>
-                        <a href="/api/file/${encodeURIComponent(file.rel_path)}?download=true" class="btn-secondary">↓</a>
-                        <a href="/api/pdf/${encodeURIComponent(file.rel_path)}" class="btn-secondary" target="_blank">📄</a>
+                    <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                            <strong style="font-size:15px;">${folder.name}</strong>
+                            <span style="font-size:12px; color:#6b7280;">${dateStr}</span>
+                        </div>
+                        ${linkLine}
+                        ${mdPanel}
+                        <div style="font-size:13px; display:flex; flex-direction:column; gap:4px;">
+                            ${skillsHtml}
+                        </div>
                     </div>
                 `;
                 list.appendChild(li);
@@ -310,7 +458,7 @@
 
             const info = document.createElement('span');
             info.style.cssText = 'font-size: 13px; color: #6b7280;';
-            info.textContent = `Pág. ${data.page} de ${data.total_pages} (${data.total} archivos)`;
+            info.textContent = `Pág. ${data.page} de ${data.total_pages} (${data.total} carpetas)`;
             pag.appendChild(info);
 
             const nextBtn = document.createElement('button');
@@ -340,6 +488,49 @@
             refreshFiles();
             setInterval(refreshFiles, 5000);
         });
+    </script>
+    <!-- ── Modal ─────────────────────────────────────────── -->
+    <div class="modal-overlay" id="fileModal" onclick="if(event.target===this) closeFileModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Archivo</h3>
+                <button class="modal-close" onclick="closeFileModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <pre id="modalPre"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showFileModal(relPath) {
+            const modal = document.getElementById('fileModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            const pre = document.getElementById('modalPre');
+            title.textContent = relPath.split('/').pop();
+            pre.textContent = 'Cargando...';
+            body.className = 'modal-body loading';
+            modal.classList.add('open');
+
+            fetch('/api/file/' + encodeURIComponent(relPath))
+                .then(r => {
+                    if (!r.ok) throw new Error(r.statusText);
+                    return r.text();
+                })
+                .then(text => {
+                    body.className = 'modal-body';
+                    pre.textContent = text;
+                })
+                .catch(err => {
+                    body.className = 'modal-body';
+                    pre.textContent = 'Error al cargar el archivo: ' + err.message;
+                });
+        }
+
+        function closeFileModal() {
+            document.getElementById('fileModal').classList.remove('open');
+        }
     </script>
 </body>
 </html>

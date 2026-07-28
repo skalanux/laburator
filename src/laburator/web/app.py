@@ -33,6 +33,7 @@ config = LaburatorConfig()
 class GenerateRequest(BaseModel):
     job_description: str
     skill: str
+    link: str = ""
 
 
 class SaveContent(BaseModel):
@@ -51,6 +52,7 @@ async def generate_skill(
     skill_name: str,
     cv_path: Path,
     wiki_path: Path,
+    link: str = "",
 ) -> tuple[str, Path]:
     """Generate a skill output from a manual job description."""
     if skill_name not in SKILL_NAMES:
@@ -107,21 +109,38 @@ async def generate_skill(
     finally:
         await llm.close()
 
-    # Save output with unique filename
+    # Save output — determine folder name
     run_date = date.today().isoformat()
     now = datetime.now()
-    timestamp = now.strftime("%H%M%S")
-    base = SKILL_FILENAMES.get(skill_name, skill_name)
-    # Short slug from the beginning of the job description (40 chars max)
-    desc_slug = _slugify(job_description[:60])[:40]
-    filename = f"{base}_{desc_slug}_{timestamp}.md"
-    out_dir = config.resolved_output_dir / run_date / "manual"
+
+    if link and link.strip():
+        # Use slugified link as folder name, files are just skill names
+        folder_name = _slugify(link.strip())
+    else:
+        # Generate a unique folder from date + time + job description slug
+        timestamp = now.strftime("%H%M%S")
+        desc_slug = _slugify(job_description[:60])[:40]
+        folder_name = f"{run_date}-{timestamp}-{desc_slug}"
+
+    filename = SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
+    out_dir = config.resolved_output_dir / run_date / folder_name
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / filename
     try:
         out_path.write_text(result, encoding="utf-8")
     except Exception as exc:
         raise RuntimeError(f"Failed to save file: {exc}")
+
+    # Also save/update job.md with the link and description
+    job_md_parts = ["# Job Description\n"]
+    if link and link.strip():
+        job_md_parts.append(f"\n**Link:** {link.strip()}\n")
+    job_md_parts.append(f"\n{job_description}")
+    job_md_path = out_dir / "job.md"
+    try:
+        job_md_path.write_text("".join(job_md_parts), encoding="utf-8")
+    except Exception:
+        pass  # non-critical
 
     return result, out_path
 
@@ -146,6 +165,7 @@ async def generate(request: GenerateRequest):
             request.skill,
             config.resolved_cv_path,
             config.resolved_llmwiki_dir,
+            link=request.link,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -173,29 +193,57 @@ async def list_outputs(
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=50),
 ):
-    """List recently generated output files (manual entries), paginated."""
+    """List generated folders (one per job), paginated by most recent."""
     out_dir = config.resolved_output_dir
-    all_files: list[dict[str, Any]] = []
+    folders: dict[str, dict[str, Any]] = {}
+
     for f in sorted(
-        out_dir.rglob("**/manual/*.md"), key=lambda p: p.stat().st_mtime, reverse=True
+        out_dir.rglob("*/*/*.md"), key=lambda p: p.stat().st_mtime, reverse=True
     ):
-        if f.is_file():
-            rel = str(f.relative_to(config.resolved_output_dir))
-            all_files.append(
-                {
-                    "filename": f.name,
-                    "rel_path": rel,
-                    "full_path": str(f),
-                    "size": f.stat().st_size,
-                    "modified": f.stat().st_mtime,
-                }
-            )
-    total = len(all_files)
+        if not f.is_file():
+            continue
+        parent = f.parent
+        key = str(parent.relative_to(out_dir))
+        if key not in folders:
+            folders[key] = {
+                "folder_path": key,
+                "name": parent.name,
+                "date": parent.parent.name,
+                "modified": f.stat().st_mtime,
+                "has_job_md": False,
+                "link": "",
+                "skills": [],
+            }
+        if f.name == "job.md":
+            folders[key]["has_job_md"] = True
+            try:
+                content = f.read_text(encoding="utf-8")
+                folders[key]["job_md_content"] = content
+                # Extract link from first line that looks like one
+                for line in content.splitlines():
+                    if line.startswith("**Link:**"):
+                        folders[key]["link"] = line.replace("**Link:**", "").strip()
+                        break
+            except Exception:
+                pass
+        else:
+            rel = str(f.relative_to(out_dir))
+            folders[key]["skills"].append({
+                "filename": f.name,
+                "rel_path": rel,
+                "size": f.stat().st_size,
+            })
+        # Keep the most recent modification time
+        folders[key]["modified"] = max(folders[key]["modified"], f.stat().st_mtime)
+
+    all_folders = sorted(folders.values(), key=lambda x: x["modified"], reverse=True)
+    total = len(all_folders)
     total_pages = max(1, (total + page_size - 1) // page_size)
     start = (page - 1) * page_size
-    files_page = all_files[start : start + page_size]
+    page_folders = all_folders[start : start + page_size]
+
     return JSONResponse({
-        "files": files_page,
+        "folders": page_folders,
         "total": total,
         "page": page,
         "page_size": page_size,
