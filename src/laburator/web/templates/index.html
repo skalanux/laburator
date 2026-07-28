@@ -20,6 +20,7 @@
         .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .loading { color: #6b7280; font-style: italic; }
         .success-msg { color: #16a34a; font-size: 13px; margin-left: 8px; }
+        .error-msg { color: #dc2626; font-size: 13px; margin-left: 8px; }
         .badge { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; }
         .btn-save { background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
         .btn-save:hover { background: #15803d; }
@@ -494,39 +495,86 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">Archivo</h3>
-                <button class="modal-close" onclick="closeFileModal()">&times;</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-secondary" id="modalDownloadBtn" style="font-size:13px;padding:6px 12px;"><i class="fa-solid fa-download"></i> Descargar</button>
+                    <button class="btn-pdf" id="modalPdfBtn" style="font-size:13px;padding:6px 12px;"><i class="fa-regular fa-file-pdf"></i> PDF</button>
+                    <button class="btn-save" id="modalSaveBtn" style="font-size:13px;padding:6px 12px;display:none;"><i class="fa-regular fa-floppy-disk"></i> Guardar</button>
+                    <button class="modal-close" onclick="closeFileModal()">&times;</button>
+                </div>
             </div>
             <div class="modal-body" id="modalBody">
-                <pre id="modalPre"></pre>
+                <textarea id="modalEditor" class="output-editor" style="display:block;min-height:300px;font-size:14px;"></textarea>
+                <span id="modalStatus" style="display:none;font-size:13px;padding:4px 0;"></span>
             </div>
         </div>
     </div>
 
     <script>
+        let modalPath = '';
+
         function showFileModal(relPath) {
+            modalPath = relPath;
             const modal = document.getElementById('fileModal');
             const title = document.getElementById('modalTitle');
-            const body = document.getElementById('modalBody');
-            const pre = document.getElementById('modalPre');
+            const editor = document.getElementById('modalEditor');
+            const status = document.getElementById('modalStatus');
+            const saveBtn = document.getElementById('modalSaveBtn');
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+            const pdfBtn = document.getElementById('modalPdfBtn');
+
             title.textContent = relPath.split('/').pop();
-            pre.textContent = 'Cargando...';
-            body.className = 'modal-body loading';
+            editor.value = 'Cargando...';
+            editor.disabled = true;
+            status.style.display = 'none';
+            saveBtn.style.display = 'none';
             modal.classList.add('open');
 
-            fetch('/api/file/' + encodeURIComponent(relPath))
+            const encoded = encodeURIComponent(relPath);
+            downloadBtn.onclick = () => window.open('/api/file/' + encoded + '?download=true', '_blank');
+            pdfBtn.onclick = () => window.open('/api/pdf/' + encoded, '_blank');
+
+            fetch('/api/file/' + encoded)
                 .then(r => {
                     if (!r.ok) throw new Error(r.statusText);
                     return r.text();
                 })
                 .then(text => {
-                    body.className = 'modal-body';
-                    pre.textContent = text;
+                    editor.value = text;
+                    editor.disabled = false;
+                    saveBtn.style.display = 'inline-flex';
                 })
                 .catch(err => {
-                    body.className = 'modal-body';
-                    pre.textContent = 'Error al cargar el archivo: ' + err.message;
+                    editor.value = 'Error al cargar el archivo: ' + err.message;
+                    editor.disabled = true;
                 });
         }
+
+        document.getElementById('modalSaveBtn').onclick = function() {
+            const editor = document.getElementById('modalEditor');
+            const status = document.getElementById('modalStatus');
+            status.style.display = 'block';
+            status.className = '';
+            status.textContent = 'Guardando...';
+
+            fetch('/api/file/' + encodeURIComponent(modalPath), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: editor.value }),
+            })
+                .then(r => {
+                    if (!r.ok) throw new Error(r.statusText);
+                    return r.json();
+                })
+                .then(data => {
+                    status.className = 'success-msg';
+                    status.textContent = '✓ Guardado';
+                    setTimeout(() => { status.style.display = 'none'; }, 2000);
+                })
+                .catch(err => {
+                    status.className = 'error-msg';
+                    status.textContent = '✗ Error: ' + err.message;
+                });
+        };
 
         function closeFileModal() {
             document.getElementById('fileModal').classList.remove('open');
