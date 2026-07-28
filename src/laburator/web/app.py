@@ -13,6 +13,7 @@ from typing import Any
 import markdown
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from weasyprint import HTML
 from pydantic import BaseModel
 
@@ -146,6 +147,10 @@ async def generate_skill(
 
 
 app = FastAPI(title="Laburator Web UI", version="0.1.0")
+
+assets_dir = Path(__file__).parent / "assets"
+if assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
 
 @app.get("/", response_class=HTMLResponse)

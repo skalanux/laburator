@@ -7,14 +7,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        h1, h2, h3 { margin: 0.5em 0; color: #1a1a1a; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f3f6fb; }
+        a { color: #5aaae0; }
+        a:hover { color: #4a99cc; }
+        h1, h2, h3 { margin: 0.5em 0; }
+        h2 { color: #e09452; }
+        h1, h3 { color: #1a1a1a; }
         .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         label { display: block; margin: 12px 0 4px; font-weight: 600; }
         textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
         textarea { min-height: 300px; resize: vertical; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
-        button:hover { background: #1d4ed8; }
+        button { background: #5aaae0; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #4a99cc; }
         button:disabled { background: #9ca3af; cursor: not-allowed; }
         .output-editor { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 300px; max-height: 600px; font-size: 14px; line-height: 1.5; }
         .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -28,15 +32,15 @@
         .btn-pdf:hover { background: #b91c1c; }
         .file-list { list-style: none; }
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white; }
-        .file-item a { color: #2563eb; text-decoration: none; font-weight: 600; }
+        .file-item a { color: #5aaae0; text-decoration: none; font-weight: 600; }
         .file-item a:hover { text-decoration: underline; }
-        .btn-secondary { background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
-        .btn-secondary:hover { background: #4b5563; }
+        .btn-secondary { background: #e09452; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
+        .btn-secondary:hover { background: #c97d3e; }
         .path { font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 8px; border-radius: 4px; word-break: break-all; margin-bottom: 16px; font-family: monospace; }
         .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
         .tab-btn { padding: 12px 24px; border: 1px solid #e5e7eb; border-bottom: none; border-radius: 8px 8px 0 0; background: #f9fafb; color: #6b7280; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; margin: 0; }
         .tab-btn:hover { background: #f3f4f6; color: #374151; }
-        .tab-btn.active { background: white; color: #2563eb; border-color: #d1d5db; border-bottom: 2px solid white; margin-bottom: -2px; }
+        .tab-btn.active { background: white; color: #5aaae0; border-color: #d1d5db; border-bottom: 2px solid white; margin-bottom: -2px; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .cv-status { font-size: 12px; margin-left: 12px; }
@@ -136,10 +140,10 @@
     </style>
 </head>
 <body>
-    <h1>🛠️ Laburator — Entradas Manuales</h1>
+    <h1 style="margin:0; line-height:0; text-align:center;"><img src="/assets/logo.png" alt="Laburator" style="height:200px; object-fit:cover; display:inline-block; border-radius:8px;"></h1>
 
     <div class="tabs">
-        <button class="tab-btn active" data-tab="generator">⚡ Generar</button>
+        <button class="tab-btn active" data-tab="generator"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar</button>
                 <button class="tab-btn" data-tab="cv"><i class="fa-regular fa-file-lines"></i> Mi CV</button>
     </div>
 
@@ -415,7 +419,7 @@
                 let linkLine = '';
                 if (folder.link) {
                     linkLine = `<div style="font-size:12px; word-break:break-all;">
-                        <i class="fa-solid fa-link" style="color:#6b7280;"></i> <a href="${folder.link}" target="_blank" style="color:#2563eb;">${folder.link}</a>
+                        <i class="fa-solid fa-link" style="color:#6b7280;"></i> <a href="${folder.link}" target="_blank" style="color:#5aaae0;">${folder.link}</a>
                     </div>`;
                 }
                 if (hasMd) {
