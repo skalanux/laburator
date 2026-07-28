@@ -19,6 +19,7 @@ _USER_PROMPT_TOPICS = {
     "createcv": ("existing CV", "Please generate a tailored single-page CV for this job."),
     "presentationletter": ("CV", "Please write a professional cover letter."),
     "interviewquestions": ("CV", "Generate interview Q&A for this role."),
+    "generarcv": ("proposal", "Please generate a tailored CV for this proposal, following the tips provided."),
 }
 
 
@@ -70,6 +71,68 @@ def load_skill(skill_name: str) -> str:
     )
 
 
+def build_proposal_messages(
+    proposal: str,
+    tips: str,
+    cv_context: str,
+    llmwiki_context: str,
+) -> list[dict[str, str]]:
+    """Build the user messages for the generar_cv proposal-based skill.
+
+    Takes a proposal text and tips instead of a job listing, using the
+    existing CV as base material.
+
+    Args:
+        proposal: The proposal/opportunity text (job listing, project, etc.).
+        tips: User-provided emphasis points and directions.
+        cv_context: User's CV markdown.
+        llmwiki_context: Wiki / knowledge base markdown.
+
+    Returns:
+        A list of one ``user`` message dict.
+    """
+    return [
+        {
+            "role": "user",
+            "content": (
+                f"## Proposal\n\n{proposal}\n\n"
+                f"## Tips\n\n{tips}\n\n"
+                f"## Existing CV\n\n{cv_context}\n\n"
+                f"## Knowledge Base\n\n{llmwiki_context}\n\n"
+                f"Generate the tailored CV following the tips above."
+            ),
+        },
+    ]
+
+
+def build_cv_to_tex_messages(
+    cv_markdown: str,
+    personal_info: str,
+) -> list[dict[str, str]]:
+    """Build the user messages for the generarcvtex skill.
+
+    Takes a markdown CV and converts it to LaTeX moderncv format.
+
+    Args:
+        cv_markdown: The markdown CV to convert.
+        personal_info: Personal info (name, title, contact, quote) for the
+            LaTeX preamble.
+
+    Returns:
+        A list of one ``user`` message dict.
+    """
+    return [
+        {
+            "role": "user",
+            "content": (
+                f"## Personal Information (for LaTeX preamble)\n\n{personal_info}\n\n"
+                f"## Markdown CV to convert\n\n{cv_markdown}\n\n"
+                f"Convert the above markdown CV to a complete LaTeX moderncv document."
+            ),
+        },
+    ]
+
+
 def build_user_messages(
     skill_name: str,
     job_data: dict[str, Any],
@@ -117,6 +180,8 @@ SKILL_NAMES = [
     "createcv",
     "presentationletter",
     "interviewquestions",
+    "generarcv",
+    "generarcvtex",
 ]
 
 SKILL_LABELS = {
@@ -124,6 +189,8 @@ SKILL_LABELS = {
     "createcv": "📄 Tailored CV",
     "presentationletter": "✉️ Cover letter",
     "interviewquestions": "❓ Interview questions",
+    "generarcv": "🎯 Generated CV",
+    "generarcvtex": "📝 LaTeX CV",
 }
 
 SKILL_FILENAMES = {
@@ -131,4 +198,6 @@ SKILL_FILENAMES = {
     "createcv": "cv",
     "presentationletter": "presentation",
     "interviewquestions": "interview",
+    "generarcv": "cv",
+    "generarcvtex": "cv",
 }
