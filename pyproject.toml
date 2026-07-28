@@ -28,6 +28,8 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
     "python-multipart>=0.0.32",
+    "markdown>=3.10",
+    "markdown>=3.10.2",
 ]
 
 [project.urls]

@@ -12,6 +12,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+import markdown
 from fastapi import FastAPI, Form, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -33,6 +34,10 @@ config = LaburatorConfig()
 class GenerateRequest(BaseModel):
     job_description: str
     skill: str
+
+
+class SaveContent(BaseModel):
+    content: str
 
 
 def _slugify(text: str) -> str:
@@ -202,6 +207,72 @@ async def serve_file(filepath: str, download: bool = Query(False, alias="downloa
     return response
 
 
+@app.put("/api/file/{filepath:path}")
+async def save_file(filepath: str, body: SaveContent):
+    """Save edited content to a file in the output directory."""
+    resolved_path = (config.resolved_output_dir / filepath).resolve()
+    base = config.resolved_output_dir.resolve()
+    if not str(resolved_path).startswith(str(base)):
+        raise HTTPException(status_code=403, detail="Access denied")
+    try:
+        resolved_path.write_text(body.content, encoding="utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return JSONResponse({"status": "ok"})
+
+
+@app.get("/api/render/{filepath:path}", response_class=HTMLResponse)
+async def render_pdf(filepath: str):
+    """Render a markdown file as HTML for print/PDF view."""
+    resolved_path = (config.resolved_output_dir / filepath).resolve()
+    if not resolved_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    base = config.resolved_output_dir.resolve()
+    if not str(resolved_path).startswith(str(base)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    md_content = resolved_path.read_text(encoding="utf-8")
+    html_body = markdown.markdown(md_content, extensions=["fenced_code", "tables"])
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laburator - PDF View</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13pt; line-height: 1.6; color: #222; padding: 2cm; max-width: 900px; margin: 0 auto; }}
+  h1, h2, h3, h4 {{ color: #111; margin-top: 1.2em; margin-bottom: 0.5em; }}
+  h1 {{ font-size: 22pt; border-bottom: 2px solid #333; padding-bottom: 8px; }}
+  h2 {{ font-size: 18pt; border-bottom: 1px solid #ccc; padding-bottom: 4px; }}
+  p {{ margin-bottom: 0.8em; }}
+  ul, ol {{ margin-left: 1.5em; margin-bottom: 0.8em; }}
+  li {{ margin-bottom: 0.3em; }}
+  pre {{ background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 11pt; }}
+  code {{ background: #f0f0f0; border-radius: 3px; padding: 1px 4px; font-size: 11pt; }}
+  blockquote {{ border-left: 4px solid #ccc; margin: 1em 0; padding: 0.5em 1em; color: #555; background: #fafafa; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
+  th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+  th {{ background: #f5f5f5; font-weight: 600; }}
+  .no-print {{ display: none; }}
+  @media print {{
+    body {{ padding: 0; }}
+    @page {{ margin: 2cm; }}
+  }}
+  .print-btn {{ position: fixed; top: 20px; right: 20px; background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; z-index: 1000; }}
+  .print-btn:hover {{ background: #1d4ed8; }}
+  @media print {{ .print-btn {{ display: none; }} }}
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">🖨️ Generar PDF</button>
+{html_body}
+<script>setTimeout(() => window.print(), 500);</script>
+</body>
+</html>"""
+
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -219,8 +290,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
         button:hover { background: #1d4ed8; }
         button:disabled { background: #9ca3af; cursor: not-allowed; }
-        .output { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 100px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: inherit; }
+        .output-editor { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 300px; max-height: 600px; font-size: 14px; line-height: 1.5; }
+        .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .loading { color: #6b7280; font-style: italic; }
+        .success-msg { color: #16a34a; font-size: 13px; margin-left: 8px; }
+        .badge { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; }
+        .btn-save { background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-save:hover { background: #15803d; }
+        .btn-pdf { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-pdf:hover { background: #b91c1c; }
         .file-list { list-style: none; }
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white; }
         .file-item a { color: #2563eb; text-decoration: none; font-weight: 600; }
@@ -249,11 +327,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <button id="generateBtn" onclick="generate()">Generar</button>
         <div id="loading" class="loading" style="display:none; margin-top: 12px;">Generando...</div>
-        <div id="result" class="output" style="display:none;"></div>
-        <div id="fileLink" style="display:none; margin-top: 12px;">
-            <a id="downloadLink" class="btn-secondary" target="_blank">Ver/Descargar archivo</a>
-            <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
-            <div id="copied" style="display:none; margin-top: 4px; color: green; font-size: 13px;">¡Copiado!</div>
+        <div id="resultArea" style="display:none;">
+            <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
+            <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
+            <div class="action-bar">
+                <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
+                <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
+                <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
+                <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
+                <span id="saveStatus" class="success-msg" style="display:none;"></span>
+                <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
+            </div>
         </div>
     </div>
 
@@ -264,12 +348,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <script>
+        let currentRelPath = null;
+
         document.getElementById('outputDirPath').textContent = "{{ OUTPUT_DIR }}";
 
         async function generate() {
             const jobDesc = document.getElementById('jobDescription').value.trim();
             const skill = document.getElementById('skill').value;
-            
+
             if (!jobDesc) {
                 alert("Por favor, pega un job description.");
                 return;
@@ -277,13 +363,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const btn = document.getElementById('generateBtn');
             const loading = document.getElementById('loading');
+            const resultArea = document.getElementById('resultArea');
             const result = document.getElementById('result');
-            const fileLink = document.getElementById('fileLink');
 
             btn.disabled = true;
             loading.style.display = 'block';
-            result.style.display = 'none';
-            fileLink.style.display = 'none';
+            resultArea.style.display = 'none';
 
             try {
                 const res = await fetch('/generate', {
@@ -298,14 +383,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
 
                 const data = await res.json();
-                result.textContent = data.content;
-                result.style.display = 'block';
-                
-const link = document.getElementById('downloadLink');
-const fileLink = document.getElementById('fileLink');
-link.href = '/api/file/' + encodeURIComponent(data.rel_path) + '?download=true';
-fileLink.style.display = 'block';
-                document.getElementById('copied').style.display = 'none';
+                currentRelPath = data.rel_path;
+
+                result.value = data.content;
+                resultArea.style.display = 'block';
+
+                document.getElementById('fileBadge').textContent = data.filename;
+
+                const link = document.getElementById('downloadLink');
+                link.href = '/api/file/' + encodeURIComponent(data.rel_path);
+
+                clearStatus();
             } catch (e) {
                 alert('Error: ' + e.message);
                 console.error(e);
@@ -315,8 +403,36 @@ fileLink.style.display = 'block';
             }
         }
 
+        async function saveFile() {
+            if (!currentRelPath) return;
+            const content = document.getElementById('result').value;
+            const status = document.getElementById('saveStatus');
+
+            try {
+                const res = await fetch('/api/file/' + encodeURIComponent(currentRelPath), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+                status.textContent = '✅ Guardado!';
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 3000);
+            } catch (e) {
+                alert('Error al guardar: ' + e.message);
+            }
+        }
+
+        function openPdf() {
+            if (!currentRelPath) return;
+            window.open('/api/render/' + encodeURIComponent(currentRelPath), '_blank');
+        }
+
         async function refreshFiles() {
-            const res = await fetch('/api/outputs?limit=30');
+            const res = await fetch('/api/outputs?limit=50');
             const data = await res.json();
             const list = document.getElementById('fileList');
             list.innerHTML = '';
@@ -338,6 +454,7 @@ fileLink.style.display = 'block';
                     <div>
                         <a href="/api/file/${encodeURIComponent(file.rel_path)}" target="_blank">Ver</a>
                         <a href="/api/file/${encodeURIComponent(file.rel_path)}?download=true" class="btn-secondary">↓</a>
+                        <a href="/api/render/${encodeURIComponent(file.rel_path)}" class="btn-secondary" target="_blank">📄</a>
                     </div>
                 `;
                 list.appendChild(li);
@@ -347,11 +464,15 @@ fileLink.style.display = 'block';
         function copyPath() {
             const path = document.getElementById('outputDirPath').textContent;
             navigator.clipboard.writeText(path).then(() => {
-                document.getElementById('copied').style.display = 'block';
+                document.getElementById('copied').style.display = 'inline';
                 setTimeout(() => {
                     document.getElementById('copied').style.display = 'none';
                 }, 2000);
             });
+        }
+
+        function clearStatus() {
+            document.getElementById('saveStatus').style.display = 'none';
         }
 
         window.addEventListener('load', () => {
