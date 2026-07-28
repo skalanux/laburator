@@ -31,52 +31,133 @@
         .btn-secondary { background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
         .btn-secondary:hover { background: #4b5563; }
         .path { font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 8px; border-radius: 4px; word-break: break-all; margin-bottom: 16px; font-family: monospace; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
+        .tab-btn { padding: 12px 24px; border: 1px solid #e5e7eb; border-bottom: none; border-radius: 8px 8px 0 0; background: #f9fafb; color: #6b7280; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; margin: 0; }
+        .tab-btn:hover { background: #f3f4f6; color: #374151; }
+        .tab-btn.active { background: white; color: #2563eb; border-color: #d1d5db; border-bottom: 2px solid white; margin-bottom: -2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .cv-status { font-size: 12px; margin-left: 12px; }
+        .cv-status.exists { color: #16a34a; }
+        .cv-status.missing { color: #dc2626; }
     </style>
 </head>
 <body>
     <h1>🛠️ Laburator — Entradas Manuales</h1>
-    <p>Pega un <strong>job description</strong> y aplica una skill para generar contenido.</p>
 
-    <div class="card">
-        <h2>Generar</h2>
-        <label for="jobDescription">Job Description (todo el texto)</label>
-        <textarea id="jobDescription" placeholder="Pega aquí el completo job description..."></textarea>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="cv">📄 Mi CV</button>
+        <button class="tab-btn" data-tab="generator">⚡ Generar</button>
+    </div>
 
-        <label for="skill">Skill a aplicar</label>
-        <select id="skill">
-            <option value="jobsynthesis">📋 Análisis de puesto</option>
-            <option value="createcv">📄 CV personalizado con análisis ats</option>
-            <option value="presentationletter">✉️ Carta de presentación</option>
-            <option value="interviewquestions">❓ Preguntas de entrevista</option>
-        </select>
-
-        <div class="row p-2">
-        <button id="generateBtn" onclick="generate()">Generar</button>
-        </div>
-        <div id="loading" class="loading" style="display:none; margin-top: 12px;">Generando...</div>
-        <div id="resultArea" style="display:none;">
-            <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
-            <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
+    <!-- ── Tab: CV ─────────────────────────────────────── -->
+    <div id="tab-cv" class="tab-content active">
+        <div class="card">
+            <h2>Curriculum Vitae</h2>
+            <p>Este CV se usa como contexto al generar contenidos.</p>
+            <div class="path" id="cvPath"></div>
+            <textarea id="cvEditor" class="output-editor" placeholder="Escribí tu CV en markdown..."></textarea>
             <div class="action-bar">
-                <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
-                <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
-                <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
-                <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
-                <span id="saveStatus" class="success-msg" style="display:none;"></span>
-                <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
+                <button class="btn-save" onclick="saveCv()">💾 Guardar CV</button>
+                <span id="cvStatus" class="success-msg" style="display:none;"></span>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <h2>Directorio de salida</h2>
-        <div class="path" id="outputDirPath"></div>
-        <ul class="file-list" id="fileList"></ul>
+    <!-- ── Tab: Generator ──────────────────────────────── -->
+    <div id="tab-generator" class="tab-content">
+        <div class="card">
+            <h2>Generar</h2>
+            <label for="jobDescription">Job Description (todo el texto)</label>
+            <textarea id="jobDescription" placeholder="Pega aquí el completo job description..."></textarea>
+
+            <label for="skill">Skill a aplicar</label>
+            <select id="skill">
+                <option value="jobsynthesis">📋 Análisis de puesto</option>
+                <option value="createcv">📄 CV personalizado con análisis ats</option>
+                <option value="presentationletter">✉️ Carta de presentación</option>
+                <option value="interviewquestions">❓ Preguntas de entrevista</option>
+            </select>
+
+            <button id="generateBtn" onclick="generate()" style="margin-top: 12px;">Generar</button>
+            <div id="loading" class="loading" style="display:none; margin-top: 12px;">Generando...</div>
+            <div id="resultArea" style="display:none;">
+                <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
+                <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
+                <div class="action-bar">
+                    <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
+                    <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
+                    <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
+                    <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
+                    <span id="saveStatus" class="success-msg" style="display:none;"></span>
+                    <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Directorio de salida</h2>
+            <div class="path" id="outputDirPath"></div>
+            <ul class="file-list" id="fileList"></ul>
+        </div>
     </div>
 
     <script>
         let currentRelPath = null;
 
+        // ── Tab switching ─────────────────────────────────
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ── CV ────────────────────────────────────────────
+        async function loadCv() {
+            try {
+                const res = await fetch('/api/cv');
+                const data = await res.json();
+                document.getElementById('cvPath').textContent = data.path;
+                document.getElementById('cvEditor').value = data.content || '';
+                const status = document.getElementById('cvStatus');
+                if (data.exists) {
+                    status.textContent = '✅ CV cargado';
+                    status.className = 'success-msg exists';
+                } else {
+                    status.textContent = '⚠️ No existe. Escribí tu CV y guardalo.';
+                    status.className = 'success-msg missing';
+                }
+                status.style.display = 'inline';
+            } catch (e) {
+                alert('Error al cargar CV: ' + e.message);
+            }
+        }
+
+        async function saveCv() {
+            const content = document.getElementById('cvEditor').value;
+            const status = document.getElementById('cvStatus');
+            try {
+                const res = await fetch('/api/cv', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+                status.textContent = '✅ CV guardado!';
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 3000);
+            } catch (e) {
+                alert('Error al guardar CV: ' + e.message);
+            }
+        }
+
+        // ── Generator ─────────────────────────────────────
         document.getElementById('outputDirPath').textContent = "{{ OUTPUT_DIR }}";
 
         async function generate() {
@@ -228,6 +309,7 @@
         }
 
         window.addEventListener('load', () => {
+            loadCv();
             refreshFiles();
             setInterval(refreshFiles, 5000);
         });

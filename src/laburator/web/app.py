@@ -231,6 +231,36 @@ async def save_file(filepath: str, body: SaveContent):
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/api/cv")
+async def get_cv():
+    """Read the CV from the configured path."""
+    cv_path = config.resolved_cv_path
+    content = ""
+    exists = cv_path.exists()
+    if exists:
+        try:
+            content = cv_path.read_text(encoding="utf-8")
+        except Exception:
+            pass
+    return JSONResponse({
+        "content": content,
+        "path": str(cv_path),
+        "exists": exists,
+    })
+
+
+@app.put("/api/cv")
+async def save_cv(body: SaveContent):
+    """Save CV content to the configured path."""
+    cv_path = config.resolved_cv_path
+    try:
+        cv_path.parent.mkdir(parents=True, exist_ok=True)
+        cv_path.write_text(body.content, encoding="utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return JSONResponse({"status": "ok", "path": str(cv_path)})
+
+
 PDF_STYLES = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #222; padding: 0; max-width: 100%; }
