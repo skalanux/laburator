@@ -4,6 +4,7 @@ Resolution order:
 1. ``~/.config/laburator/skills/<name>.md`` (user override)
 2. ``<package_dir>/skills/<name>.md`` (built-in default)
 """
+
 from __future__ import annotations
 
 import json
@@ -15,17 +16,27 @@ logger = logging.getLogger(__name__)
 
 #: System prompt topic keys passed to every skill call by the generic builder.
 _USER_PROMPT_TOPICS = {
-    "jobsynthesis": ("job listing", "Please produce a detailed job synthesis following your instructions."),
-    "createcv": ("existing CV", "Please generate a tailored single-page CV for this job."),
+    "jobsynthesis": (
+        "job listing",
+        "Please produce a detailed job synthesis following your instructions.",
+    ),
+    "createcv": (
+        "existing CV",
+        "Please generate a tailored single-page CV for this job.",
+    ),
     "presentationletter": ("CV", "Please write a professional cover letter."),
     "interviewquestions": ("CV", "Generate interview Q&A for this role."),
-    "generarcv": ("proposal", "Please generate a tailored CV for this proposal, following the tips provided."),
+    "generarcv": (
+        "proposal",
+        "Please generate a tailored CV for this proposal, following the tips provided.",
+    ),
 }
 
 
 def _override_dir() -> Path:
     """Return ``~/.config/laburator/skills/`` (respects ``$XDG_CONFIG_HOME``)."""
     import os
+
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "laburator" / "skills"
@@ -198,6 +209,6 @@ SKILL_FILENAMES = {
     "createcv": "cv",
     "presentationletter": "presentation",
     "interviewquestions": "interview",
-    "generarcv": "cv",
+    "generarcv": "cv ats",
     "generarcvtex": "cv",
 }
