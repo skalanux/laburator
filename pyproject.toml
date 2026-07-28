@@ -29,7 +29,7 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     "python-multipart>=0.0.32",
     "markdown>=3.10",
-    "markdown>=3.10.2",
+    "weasyprint>=69.0",
 ]
 
 [project.urls]

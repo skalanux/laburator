@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laburator - Generador Rápido</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        h1, h2, h3 { margin: 0.5em 0; color: #1a1a1a; }
+        .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        label { display: block; margin: 12px 0 4px; font-weight: 600; }
+        textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+        textarea { min-height: 300px; resize: vertical; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .output-editor { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 300px; max-height: 600px; font-size: 14px; line-height: 1.5; }
+        .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .loading { color: #6b7280; font-style: italic; }
+        .success-msg { color: #16a34a; font-size: 13px; margin-left: 8px; }
+        .badge { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; }
+        .btn-save { background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-save:hover { background: #15803d; }
+        .btn-pdf { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-pdf:hover { background: #b91c1c; }
+        .file-list { list-style: none; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white; }
+        .file-item a { color: #2563eb; text-decoration: none; font-weight: 600; }
+        .file-item a:hover { text-decoration: underline; }
+        .btn-secondary { background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
+        .btn-secondary:hover { background: #4b5563; }
+        .path { font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 8px; border-radius: 4px; word-break: break-all; margin-bottom: 16px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🛠️ Laburator — Entradas Manuales</h1>
+    <p>Pega un <strong>job description</strong> y aplica una skill para generar contenido.</p>
+
+    <div class="card">
+        <h2>Generar</h2>
+        <label for="jobDescription">Job Description (todo el texto)</label>
+        <textarea id="jobDescription" placeholder="Pega aquí el completo job description..."></textarea>
+
+        <label for="skill">Skill a aplicar</label>
+        <select id="skill">
+            <option value="jobsynthesis">📋 Análisis de puesto</option>
+            <option value="createcv">📄 CV personalizado con análisis ats</option>
+            <option value="presentationletter">✉️ Carta de presentación</option>
+            <option value="interviewquestions">❓ Preguntas de entrevista</option>
+        </select>
+
+        <div class="row p-2">
+        <button id="generateBtn" onclick="generate()">Generar</button>
+        </div>
+        <div id="loading" class="loading" style="display:none; margin-top: 12px;">Generando...</div>
+        <div id="resultArea" style="display:none;">
+            <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
+            <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
+            <div class="action-bar">
+                <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
+                <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
+                <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
+                <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
+                <span id="saveStatus" class="success-msg" style="display:none;"></span>
+                <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Directorio de salida</h2>
+        <div class="path" id="outputDirPath"></div>
+        <ul class="file-list" id="fileList"></ul>
+    </div>
+
+    <script>
+        let currentRelPath = null;
+
+        document.getElementById('outputDirPath').textContent = "{{ OUTPUT_DIR }}";
+
+        async function generate() {
+            const jobDesc = document.getElementById('jobDescription').value.trim();
+            const skill = document.getElementById('skill').value;
+
+            if (!jobDesc) {
+                alert("Por favor, pega un job description.");
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const resultArea = document.getElementById('resultArea');
+            const result = document.getElementById('result');
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            resultArea.style.display = 'none';
+
+            try {
+                const res = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_description: jobDesc, skill: skill })
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error('Error: ' + err);
+                }
+
+                const data = await res.json();
+                currentRelPath = data.rel_path;
+
+                result.value = data.content;
+                resultArea.style.display = 'block';
+
+                document.getElementById('fileBadge').textContent = data.filename;
+
+                const link = document.getElementById('downloadLink');
+                link.href = '/api/file/' + encodeURIComponent(data.rel_path);
+
+                clearStatus();
+            } catch (e) {
+                alert('Error: ' + e.message);
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function openPdf() {
+            const content = document.getElementById('result').value;
+            if (!content) return;
+            const filename = currentRelPath
+                ? currentRelPath.split('/').pop().replace('.md', '.pdf')
+                : 'document.pdf';
+            try {
+                const res = await fetch('/api/pdf/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, filename: filename })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert('Error al generar PDF: ' + e.message);
+            }
+        }
+
+        async function saveFile() {
+            if (!currentRelPath) return;
+            const content = document.getElementById('result').value;
+            const status = document.getElementById('saveStatus');
+
+            try {
+                const res = await fetch('/api/file/' + encodeURIComponent(currentRelPath), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+                status.textContent = '✅ Guardado!';
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 3000);
+            } catch (e) {
+                alert('Error al guardar: ' + e.message);
+            }
+        }
+
+        async function refreshFiles() {
+            const res = await fetch('/api/outputs?limit=50');
+            const data = await res.json();
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+
+            if (!data.files || data.files.length === 0) {
+                list.innerHTML = '<li style="color:#6b7280; padding:12px;">No hay archivos generados aún.</li>';
+                return;
+            }
+
+            data.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                const relPath = file.rel_path.split('/').pop();
+                const dateStr = new Date(file.modified * 1000).toLocaleDateString();
+                li.innerHTML = `
+                    <div>
+                        <strong>${relPath}</strong> • ${dateStr} • ${file.size} bytes
+                    </div>
+                    <div>
+                        <a href="/api/file/${encodeURIComponent(file.rel_path)}" target="_blank">Ver</a>
+                        <a href="/api/file/${encodeURIComponent(file.rel_path)}?download=true" class="btn-secondary">↓</a>
+                        <a href="/api/pdf/${encodeURIComponent(file.rel_path)}" class="btn-secondary" target="_blank">📄</a>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function copyPath() {
+            const path = document.getElementById('outputDirPath').textContent;
+            navigator.clipboard.writeText(path).then(() => {
+                document.getElementById('copied').style.display = 'inline';
+                setTimeout(() => {
+                    document.getElementById('copied').style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        function clearStatus() {
+            document.getElementById('saveStatus').style.display = 'none';
+        }
+
+        window.addEventListener('load', () => {
+            refreshFiles();
+            setInterval(refreshFiles, 5000);
+        });
+    </script>
+</body>
+</html>
+

@@ -4,8 +4,6 @@ Start with:
     uvicorn laburator.web.app:app --reload
 """
 
-import asyncio
-import json
 import os
 import re
 from datetime import date, datetime
@@ -13,8 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import markdown
-from fastapi import FastAPI, Form, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from weasyprint import HTML
 from pydantic import BaseModel
 
 from laburator.config import LaburatorConfig
@@ -108,9 +107,14 @@ async def generate_skill(
     finally:
         await llm.close()
 
-    # Save output
+    # Save output with unique filename
     run_date = date.today().isoformat()
-    filename = SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
+    now = datetime.now()
+    timestamp = now.strftime("%H%M%S")
+    base = SKILL_FILENAMES.get(skill_name, skill_name)
+    # Short slug from the beginning of the job description (40 chars max)
+    desc_slug = _slugify(job_description[:60])[:40]
+    filename = f"{base}_{desc_slug}_{timestamp}.md"
     out_dir = config.resolved_output_dir / run_date / "manual"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / filename
@@ -128,7 +132,7 @@ app = FastAPI(title="Laburator Web UI", version="0.1.0")
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Serve the main HTML page."""
-    html = HTML_TEMPLATE
+    html = _load_template()
     html = html.replace("{{ OUTPUT_DIR }}", str(config.resolved_output_dir))
     return html
 
@@ -170,7 +174,9 @@ async def list_outputs(limit: int = Query(20, ge=1, le=100)):
     out_dir = config.resolved_output_dir
     files: list[dict[str, Any]] = []
     # Search for all .md files in any /manual/ subdirectory
-    for f in sorted(out_dir.rglob("**/manual/*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for f in sorted(
+        out_dir.rglob("**/manual/*.md"), key=lambda p: p.stat().st_mtime, reverse=True
+    ):
         if f.is_file():
             rel = str(f.relative_to(config.resolved_output_dir))
             files.append(
@@ -201,9 +207,13 @@ async def serve_file(filepath: str, download: bool = Query(False, alias="downloa
 
     response = FileResponse(path=resolved_path, filename=resolved_path.name)
     if download:
-        response.headers["Content-Disposition"] = f'attachment; filename="{resolved_path.name}"'
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{resolved_path.name}"'
+        )
     else:
-        response.headers["Content-Disposition"] = f'inline; filename="{resolved_path.name}"'
+        response.headers["Content-Disposition"] = (
+            f'inline; filename="{resolved_path.name}"'
+        )
     return response
 
 
@@ -221,9 +231,42 @@ async def save_file(filepath: str, body: SaveContent):
     return JSONResponse({"status": "ok"})
 
 
-@app.get("/api/render/{filepath:path}", response_class=HTMLResponse)
-async def render_pdf(filepath: str):
-    """Render a markdown file as HTML for print/PDF view."""
+PDF_STYLES = """
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #222; padding: 0; max-width: 100%; }
+h1, h2, h3, h4 { color: #111; margin-top: 1em; margin-bottom: 0.4em; }
+h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 6px; }
+h2 { font-size: 15pt; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+h3 { font-size: 13pt; }
+p { margin-bottom: 0.6em; }
+ul, ol { margin-left: 1.3em; margin-bottom: 0.6em; }
+li { margin-bottom: 0.2em; }
+pre { background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 8px; font-size: 10pt; overflow-x: auto; page-break-inside: avoid; }
+code { background: #f0f0f0; border-radius: 2px; padding: 1px 3px; font-size: 10pt; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid #ccc; margin: 0.8em 0; padding: 0.3em 0.8em; color: #555; background: #fafafa; }
+table { border-collapse: collapse; width: 100%; margin: 0.8em 0; page-break-inside: avoid; }
+th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+th { background: #f5f5f5; font-weight: 600; }
+img { max-width: 100%; height: auto; }
+hr { border: none; border-top: 1px solid #ddd; margin: 1em 0; }
+@page { margin: 2cm; }
+"""
+
+
+def _markdown_to_pdf_bytes(md_content: str) -> bytes:
+    """Convert markdown text to PDF bytes using weasyprint."""
+    html_body = markdown.markdown(md_content, extensions=["fenced_code", "tables"])
+    html_doc = (
+        "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
+        f"<style>{PDF_STYLES}</style></head><body>{html_body}</body></html>"
+    )
+    return HTML(string=html_doc).write_pdf()
+
+
+@app.get("/api/pdf/{filepath:path}")
+async def get_pdf(filepath: str):
+    """Generate a PDF from a saved markdown file and return as download."""
     resolved_path = (config.resolved_output_dir / filepath).resolve()
     if not resolved_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
@@ -232,254 +275,41 @@ async def render_pdf(filepath: str):
         raise HTTPException(status_code=403, detail="Access denied")
 
     md_content = resolved_path.read_text(encoding="utf-8")
-    html_body = markdown.markdown(md_content, extensions=["fenced_code", "tables"])
+    try:
+        pdf_bytes = _markdown_to_pdf_bytes(md_content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
-    return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laburator - PDF View</title>
-<style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13pt; line-height: 1.6; color: #222; padding: 2cm; max-width: 900px; margin: 0 auto; }}
-  h1, h2, h3, h4 {{ color: #111; margin-top: 1.2em; margin-bottom: 0.5em; }}
-  h1 {{ font-size: 22pt; border-bottom: 2px solid #333; padding-bottom: 8px; }}
-  h2 {{ font-size: 18pt; border-bottom: 1px solid #ccc; padding-bottom: 4px; }}
-  p {{ margin-bottom: 0.8em; }}
-  ul, ol {{ margin-left: 1.5em; margin-bottom: 0.8em; }}
-  li {{ margin-bottom: 0.3em; }}
-  pre {{ background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 11pt; }}
-  code {{ background: #f0f0f0; border-radius: 3px; padding: 1px 4px; font-size: 11pt; }}
-  blockquote {{ border-left: 4px solid #ccc; margin: 1em 0; padding: 0.5em 1em; color: #555; background: #fafafa; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
-  th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-  th {{ background: #f5f5f5; font-weight: 600; }}
-  .no-print {{ display: none; }}
-  @media print {{
-    body {{ padding: 0; }}
-    @page {{ margin: 2cm; }}
-  }}
-  .print-btn {{ position: fixed; top: 20px; right: 20px; background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; z-index: 1000; }}
-  .print-btn:hover {{ background: #1d4ed8; }}
-  @media print {{ .print-btn {{ display: none; }} }}
-</style>
-</head>
-<body>
-<button class="print-btn" onclick="window.print()">🖨️ Generar PDF</button>
-{html_body}
-<script>setTimeout(() => window.print(), 500);</script>
-</body>
-</html>"""
+    pdf_name = resolved_path.stem + ".pdf"
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{pdf_name}"',
+    })
 
 
-HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laburator - Generador Rápido</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        h1, h2, h3 { margin: 0.5em 0; color: #1a1a1a; }
-        .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        label { display: block; margin: 12px 0 4px; font-weight: 600; }
-        textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
-        textarea { min-height: 300px; resize: vertical; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
-        button:hover { background: #1d4ed8; }
-        button:disabled { background: #9ca3af; cursor: not-allowed; }
-        .output-editor { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 300px; max-height: 600px; font-size: 14px; line-height: 1.5; }
-        .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .loading { color: #6b7280; font-style: italic; }
-        .success-msg { color: #16a34a; font-size: 13px; margin-left: 8px; }
-        .badge { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; }
-        .btn-save { background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
-        .btn-save:hover { background: #15803d; }
-        .btn-pdf { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
-        .btn-pdf:hover { background: #b91c1c; }
-        .file-list { list-style: none; }
-        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white; }
-        .file-item a { color: #2563eb; text-decoration: none; font-weight: 600; }
-        .file-item a:hover { text-decoration: underline; }
-        .btn-secondary { background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
-        .btn-secondary:hover { background: #4b5563; }
-        .path { font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 8px; border-radius: 4px; word-break: break-all; margin-bottom: 16px; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <h1>🛠️ Laburator — Entradas Manuales</h1>
-    <p>Pega un <strong>job description</strong> y aplica una skill para generar contenido.</p>
+class PdfConvertBody(BaseModel):
+    content: str
+    filename: str = "document"
 
-    <div class="card">
-        <h2>Generar</h2>
-        <label for="jobDescription">Job Description (todo el texto)</label>
-        <textarea id="jobDescription" placeholder="Pega aquí el completo job description..."></textarea>
 
-        <label for="skill">Skill a aplicar</label>
-        <select id="skill">
-            <option value="jobsynthesis">📋 Análisis de puesto</option>
-            <option value="generarcv">📄 CV personalizado con análisis ats</option>
-            <option value="presentationletter">✉️ Carta de presentación</option>
-            <option value="interviewquestions">❓ Preguntas de entrevista</option>
-        </select>
+@app.post("/api/pdf/convert")
+async def convert_pdf(body: PdfConvertBody):
+    """Convert raw markdown text to PDF and return as download."""
+    try:
+        pdf_bytes = _markdown_to_pdf_bytes(body.content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
-        <button id="generateBtn" onclick="generate()">Generar</button>
-        <div id="loading" class="loading" style="display:none; margin-top: 12px;">Generando...</div>
-        <div id="resultArea" style="display:none;">
-            <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
-            <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
-            <div class="action-bar">
-                <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
-                <button id="pdfBtn" class="btn-pdf" onclick="openPdf()">📄 PDF</button>
-                <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
-                <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
-                <span id="saveStatus" class="success-msg" style="display:none;"></span>
-                <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
-            </div>
-        </div>
-    </div>
+    pdf_name = body.filename.rstrip(".md") + ".pdf"
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{pdf_name}"',
+    })
 
-    <div class="card">
-        <h2>Directorio de salida</h2>
-        <div class="path" id="outputDirPath"></div>
-        <ul class="file-list" id="fileList"></ul>
-    </div>
 
-    <script>
-        let currentRelPath = null;
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
-        document.getElementById('outputDirPath').textContent = "{{ OUTPUT_DIR }}";
-
-        async function generate() {
-            const jobDesc = document.getElementById('jobDescription').value.trim();
-            const skill = document.getElementById('skill').value;
-
-            if (!jobDesc) {
-                alert("Por favor, pega un job description.");
-                return;
-            }
-
-            const btn = document.getElementById('generateBtn');
-            const loading = document.getElementById('loading');
-            const resultArea = document.getElementById('resultArea');
-            const result = document.getElementById('result');
-
-            btn.disabled = true;
-            loading.style.display = 'block';
-            resultArea.style.display = 'none';
-
-            try {
-                const res = await fetch('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ job_description: jobDesc, skill: skill })
-                });
-
-                if (!res.ok) {
-                    const err = await res.text();
-                    throw new Error('Error: ' + err);
-                }
-
-                const data = await res.json();
-                currentRelPath = data.rel_path;
-
-                result.value = data.content;
-                resultArea.style.display = 'block';
-
-                document.getElementById('fileBadge').textContent = data.filename;
-
-                const link = document.getElementById('downloadLink');
-                link.href = '/api/file/' + encodeURIComponent(data.rel_path);
-
-                clearStatus();
-            } catch (e) {
-                alert('Error: ' + e.message);
-                console.error(e);
-            } finally {
-                btn.disabled = false;
-                loading.style.display = 'none';
-            }
-        }
-
-        async function saveFile() {
-            if (!currentRelPath) return;
-            const content = document.getElementById('result').value;
-            const status = document.getElementById('saveStatus');
-
-            try {
-                const res = await fetch('/api/file/' + encodeURIComponent(currentRelPath), {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: content })
-                });
-                if (!res.ok) {
-                    const err = await res.text();
-                    throw new Error(err);
-                }
-                status.textContent = '✅ Guardado!';
-                status.style.display = 'inline';
-                setTimeout(() => { status.style.display = 'none'; }, 3000);
-            } catch (e) {
-                alert('Error al guardar: ' + e.message);
-            }
-        }
-
-        function openPdf() {
-            if (!currentRelPath) return;
-            window.open('/api/render/' + encodeURIComponent(currentRelPath), '_blank');
-        }
-
-        async function refreshFiles() {
-            const res = await fetch('/api/outputs?limit=50');
-            const data = await res.json();
-            const list = document.getElementById('fileList');
-            list.innerHTML = '';
-
-            if (!data.files || data.files.length === 0) {
-                list.innerHTML = '<li style="color:#6b7280; padding:12px;">No hay archivos generados aún.</li>';
-                return;
-            }
-
-            data.files.forEach(file => {
-                const li = document.createElement('li');
-                li.className = 'file-item';
-                const relPath = file.rel_path.split('/').pop();
-                const dateStr = new Date(file.modified * 1000).toLocaleDateString();
-                li.innerHTML = `
-                    <div>
-                        <strong>${relPath}</strong> • ${dateStr} • ${file.size} bytes
-                    </div>
-                    <div>
-                        <a href="/api/file/${encodeURIComponent(file.rel_path)}" target="_blank">Ver</a>
-                        <a href="/api/file/${encodeURIComponent(file.rel_path)}?download=true" class="btn-secondary">↓</a>
-                        <a href="/api/render/${encodeURIComponent(file.rel_path)}" class="btn-secondary" target="_blank">📄</a>
-                    </div>
-                `;
-                list.appendChild(li);
-            });
-        }
-
-        function copyPath() {
-            const path = document.getElementById('outputDirPath').textContent;
-            navigator.clipboard.writeText(path).then(() => {
-                document.getElementById('copied').style.display = 'inline';
-                setTimeout(() => {
-                    document.getElementById('copied').style.display = 'none';
-                }, 2000);
-            });
-        }
-
-        function clearStatus() {
-            document.getElementById('saveStatus').style.display = 'none';
-        }
-
-        window.addEventListener('load', () => {
-            refreshFiles();
-            setInterval(refreshFiles, 5000);
-        });
-    </script>
-</body>
-</html>
-"""
+def _load_template() -> str:
+    """Read the HTML template from the templates directory."""
+    tpl_path = TEMPLATE_DIR / "index.html"
+    if not tpl_path.exists():
+        raise RuntimeError(f"Template not found: {tpl_path}")
+    return tpl_path.read_text(encoding="utf-8")
