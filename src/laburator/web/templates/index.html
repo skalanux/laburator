@@ -8,17 +8,17 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f3f6fb; }
-        a { color: #5aaae0; }
-        a:hover { color: #4a99cc; }
+        a { color: #2571aa; }
+        a:hover { color: #1e5d8c; }
         h1, h2, h3 { margin: 0.5em 0; }
-        h2 { color: #e09452; }
+        h2 { color: #103a62; }
         h1, h3 { color: #1a1a1a; }
         .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         label { display: block; margin: 12px 0 4px; font-weight: 600; }
         textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
         textarea { min-height: 300px; resize: vertical; }
-        button { background: #5aaae0; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
-        button:hover { background: #4a99cc; }
+        button { background: #2571aa; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #1e5d8c; }
         button:disabled { background: #9ca3af; cursor: not-allowed; }
         .output-editor { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-top: 16px; min-height: 300px; max-height: 600px; font-size: 14px; line-height: 1.5; }
         .action-bar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -26,53 +26,29 @@
         .success-msg { color: #16a34a; font-size: 13px; margin-left: 8px; }
         .error-msg { color: #dc2626; font-size: 13px; margin-left: 8px; }
         .badge { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; }
-        .btn-save { background: #16a34a; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
-        .btn-save:hover { background: #15803d; }
-        .btn-pdf { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
-        .btn-pdf:hover { background: #b91c1c; }
+        .btn-save { background: #2571aa; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-save:hover { background: #1e5d8c; }
+        .btn-pdf { background: #2571aa; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-pdf:hover { background: #1e5d8c; }
         .file-list { list-style: none; }
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white; }
-        .file-item a { color: #5aaae0; text-decoration: none; font-weight: 600; }
+        .file-item a { color: #2571aa; text-decoration: none; font-weight: 600; }
         .file-item a:hover { text-decoration: underline; }
-        .btn-secondary { background: #e09452; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-left: 8px; }
-        .btn-secondary:hover { background: #c97d3e; }
+        .btn-secondary { background: #103a62; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+        .btn-secondary:hover { background: #0d2f4f; }
+        .btn-secondary[disabled] { background: #4a6b8a; cursor: not-allowed; }
+        .btn-outline-primary { background: transparent; color: #2571aa; border: 1px solid #2571aa; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600; }
+        .btn-outline-primary:hover { background: #dceaf5; }
         .path { font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 8px; border-radius: 4px; word-break: break-all; margin-bottom: 16px; font-family: monospace; }
         .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
         .tab-btn { padding: 12px 24px; border: 1px solid #e5e7eb; border-bottom: none; border-radius: 8px 8px 0 0; background: #f9fafb; color: #6b7280; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; margin: 0; }
         .tab-btn:hover { background: #f3f4f6; color: #374151; }
-        .tab-btn.active { background: white; color: #5aaae0; border-color: #d1d5db; border-bottom: 2px solid white; margin-bottom: -2px; }
+        .tab-btn.active { background: white; color: #2571aa; border-color: #d1d5db; border-bottom: 2px solid white; margin-bottom: -2px; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .cv-status { font-size: 12px; margin-left: 12px; }
         .cv-status.exists { color: #16a34a; }
         .cv-status.missing { color: #dc2626;         }
-        .disclosure {
-            cursor: pointer;
-            font-size: 10px;
-            user-select: none;
-            display: inline-block;
-            transition: transform 0.2s;
-            color: #6b7280;
-        }
-        .disclosure.open {
-            transform: rotate(90deg);
-        }
-        .job-md-panel {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 12px;
-            margin: 4px 0;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .job-md-panel pre {
-            margin: 0;
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-size: 13px;
-            line-height: 1.5;
-        }
 
         /* Modal */
         .modal-overlay {
@@ -171,10 +147,10 @@
                 <label for="result">Resultado <span id="fileBadge" class="badge"></span></label>
                 <textarea id="result" class="output-editor" placeholder="El contenido generado aparecerá aquí..."></textarea>
                 <div class="action-bar">
-                    <button id="saveBtn" class="btn-save" onclick="saveFile()">💾 Guardar</button>
+                    <button id="saveBtn" class="btn-save" onclick="saveFile()"><i class="fa-regular fa-floppy-disk"></i> Guardar</button>
                     <button id="pdfBtn" class="btn-pdf" onclick="openPdf()"><i class="fa-regular fa-file-pdf"></i> PDF</button>
-                    <a id="downloadLink" class="btn-secondary" target="_blank">Ver archivo</a>
-                    <button onclick="copyPath()" class="btn-secondary">Copiar ruta</button>
+                    <a id="downloadLink" class="btn-save" target="_blank" style="padding:8px 16px; text-decoration:none;">Ver archivo</a>
+                    <button onclick="copyPath()" class="btn-save" style="padding:8px 16px;">Copiar ruta</button>
                     <span id="saveStatus" class="success-msg" style="display:none;"></span>
                     <div id="copied" style="display:none; margin-left: 8px; color: #16a34a; font-size: 13px;">¡Copiado!</div>
                 </div>
@@ -197,7 +173,7 @@
             <div class="path" id="cvPath"></div>
             <textarea id="cvEditor" class="output-editor" placeholder="Escribí tu CV en markdown..."></textarea>
             <div class="action-bar">
-                <button class="btn-save" onclick="saveCv()">💾 Guardar CV</button>
+                <button class="btn-save" onclick="saveCv()"><i class="fa-regular fa-floppy-disk"></i> Guardar CV</button>
                 <span id="cvStatus" class="success-msg" style="display:none;"></span>
             </div>
         </div>
@@ -225,10 +201,10 @@
                 document.getElementById('cvEditor').value = data.content || '';
                 const status = document.getElementById('cvStatus');
                 if (data.exists) {
-                    status.textContent = '✅ CV cargado';
+                    status.innerHTML = '<i class="fa-regular fa-circle-check"></i> CV cargado';
                     status.className = 'success-msg exists';
                 } else {
-                    status.textContent = '⚠️ No existe. Escribí tu CV y guardalo.';
+                    status.innerHTML = '<i class="fa-regular fa-triangle-exclamation"></i> No existe. Escribí tu CV y guardalo.';
                     status.className = 'success-msg missing';
                 }
                 status.style.display = 'inline';
@@ -250,7 +226,7 @@
                     const err = await res.text();
                     throw new Error(err);
                 }
-                status.textContent = '✅ CV guardado!';
+                status.innerHTML = '<i class="fa-regular fa-circle-check"></i> CV guardado!';
                 status.style.display = 'inline';
                 setTimeout(() => { status.style.display = 'none'; }, 3000);
             } catch (e) {
@@ -358,7 +334,7 @@
                     const err = await res.text();
                     throw new Error(err);
                 }
-                status.textContent = '✅ Guardado!';
+                status.innerHTML = '<i class="fa-regular fa-circle-check"></i> Guardado!';
                 status.style.display = 'inline';
                 setTimeout(() => { status.style.display = 'none'; }, 3000);
             } catch (e) {
@@ -368,15 +344,6 @@
 
         let currentPage = 1;
         const PAGE_SIZE = 15;
-
-        function toggleJobMd(id) {
-            const panel = document.getElementById('md-' + id);
-            const disc = document.getElementById('disc-' + id);
-            if (!panel) return;
-            const isOpen = panel.style.display !== 'none';
-            panel.style.display = isOpen ? 'none' : 'block';
-            if (disc) disc.classList.toggle('open', !isOpen);
-        }
 
         async function refreshFiles() {
             const res = await fetch(`/api/outputs?page=${currentPage}&page_size=${PAGE_SIZE}`);
@@ -419,21 +386,16 @@
                 let linkLine = '';
                 if (folder.link) {
                     linkLine = `<div style="font-size:12px; word-break:break-all;">
-                        <i class="fa-solid fa-link" style="color:#6b7280;"></i> <a href="${folder.link}" target="_blank" style="color:#5aaae0;">${folder.link}</a>
+                        <i class="fa-solid fa-link" style="color:#6b7280;"></i> <a href="${folder.link}" target="_blank" style="color:#2571aa;">${folder.link}</a>
                     </div>`;
                 }
                 if (hasMd) {
                     linkLine += `
                         <div style="font-size:12px; margin-top:2px;">
-                            <span class="disclosure" onclick="toggleJobMd('${liId}')" id="disc-${liId}"><i class="fa-solid fa-chevron-right"></i></span>
-                            <span class="disclosure" onclick="toggleJobMd('${liId}')" style="cursor:pointer; color:#6b7280;">ver detalle</span>
+                            <span style="cursor:pointer; color:#6b7280;" onclick="showFileModal('${folder.folder_path}/job.md', true)"><i class="fa-regular fa-eye"></i> ver detalle</span>
                         </div>
                     `;
                 }
-
-                const mdPanel = hasMd
-                    ? `<div id="md-${liId}" class="job-md-panel" style="display:none;"><pre>${folder.job_md_content}</pre></div>`
-                    : '';
 
                 li.innerHTML = `
                     <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
@@ -442,7 +404,6 @@
                             <span style="font-size:12px; color:#6b7280;">${dateStr}</span>
                         </div>
                         ${linkLine}
-                        ${mdPanel}
                         <div style="font-size:13px; display:flex; flex-direction:column; gap:4px;">
                             ${skillsHtml}
                         </div>
@@ -500,14 +461,15 @@
             <div class="modal-header">
                 <h3 id="modalTitle">Archivo</h3>
                 <div style="display:flex; gap:8px; align-items:center;">
-                    <button class="btn-secondary" id="modalDownloadBtn" style="font-size:13px;padding:6px 12px;"><i class="fa-solid fa-download"></i> Descargar</button>
-                    <button class="btn-pdf" id="modalPdfBtn" style="font-size:13px;padding:6px 12px;"><i class="fa-regular fa-file-pdf"></i> PDF</button>
-                    <button class="btn-save" id="modalSaveBtn" style="font-size:13px;padding:6px 12px;display:none;"><i class="fa-regular fa-floppy-disk"></i> Guardar</button>
+                    <button class="btn-outline-primary" id="modalDownloadBtn"><i class="fa-solid fa-download"></i> Descargar</button>
+                    <button class="btn-outline-primary" id="modalPdfBtn"><i class="fa-regular fa-file-pdf"></i> PDF</button>
+                    <button class="btn-outline-primary" id="modalSaveBtn" style="display:none;"><i class="fa-regular fa-floppy-disk"></i> Guardar</button>
                     <button class="modal-close" onclick="closeFileModal()">&times;</button>
                 </div>
             </div>
             <div class="modal-body" id="modalBody">
                 <textarea id="modalEditor" class="output-editor" style="display:block;min-height:300px;font-size:14px;"></textarea>
+                <div id="modalViewer" style="display:none; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:20px; overflow-y:auto; min-height:300px; max-height:600px;"><pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-size:14px; line-height:1.5; font-family:'SF Mono','Fira Code','Consolas',monospace;"></pre></div>
                 <span id="modalStatus" style="display:none;font-size:13px;padding:4px 0;"></span>
             </div>
         </div>
@@ -516,21 +478,34 @@
     <script>
         let modalPath = '';
 
-        function showFileModal(relPath) {
+        function showFileModal(relPath, readOnly) {
             modalPath = relPath;
             const modal = document.getElementById('fileModal');
             const title = document.getElementById('modalTitle');
             const editor = document.getElementById('modalEditor');
+            const viewer = document.getElementById('modalViewer');
+            const viewerPre = viewer ? viewer.querySelector('pre') : null;
             const status = document.getElementById('modalStatus');
             const saveBtn = document.getElementById('modalSaveBtn');
             const downloadBtn = document.getElementById('modalDownloadBtn');
             const pdfBtn = document.getElementById('modalPdfBtn');
 
             title.textContent = relPath.split('/').pop();
-            editor.value = 'Cargando...';
-            editor.disabled = true;
             status.style.display = 'none';
-            saveBtn.style.display = 'none';
+
+            if (readOnly) {
+                editor.style.display = 'none';
+                viewer.style.display = 'block';
+                viewerPre.textContent = 'Cargando...';
+                saveBtn.style.display = 'none';
+            } else {
+                editor.style.display = 'block';
+                viewer.style.display = 'none';
+                editor.value = 'Cargando...';
+                editor.disabled = true;
+                saveBtn.style.display = 'none';
+            }
+
             modal.classList.add('open');
 
             const encoded = encodeURIComponent(relPath);
@@ -543,13 +518,22 @@
                     return r.text();
                 })
                 .then(text => {
-                    editor.value = text;
-                    editor.disabled = false;
-                    saveBtn.style.display = 'inline-flex';
+                    if (readOnly) {
+                        viewerPre.textContent = text;
+                    } else {
+                        editor.value = text;
+                        editor.disabled = false;
+                        saveBtn.style.display = 'inline-flex';
+                    }
                 })
                 .catch(err => {
-                    editor.value = 'Error al cargar el archivo: ' + err.message;
-                    editor.disabled = true;
+                    const msg = 'Error al cargar el archivo: ' + err.message;
+                    if (readOnly) {
+                        viewerPre.textContent = msg;
+                    } else {
+                        editor.value = msg;
+                        editor.disabled = true;
+                    }
                 });
         }
 
@@ -571,12 +555,12 @@
                 })
                 .then(data => {
                     status.className = 'success-msg';
-                    status.textContent = '✓ Guardado';
+                    status.innerHTML = '<i class="fa-regular fa-circle-check"></i> Guardado';
                     setTimeout(() => { status.style.display = 'none'; }, 2000);
                 })
                 .catch(err => {
                     status.className = 'error-msg';
-                    status.textContent = '✗ Error: ' + err.message;
+                    status.innerHTML = '<i class="fa-regular fa-circle-xmark"></i> Error: ' + err.message;
                 });
         };
 
