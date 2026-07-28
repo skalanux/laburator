@@ -1,7 +1,7 @@
 """Typer CLI for laburator.
 
-Provides ``search``, ``synth``, ``run``, ``list``, and ``config``
-commands that drive the job-search pipeline.
+Provides ``search``, ``synth``, ``run``, ``generar-cv``, ``list``, and
+``config`` commands that drive the job-search pipeline.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import typer
 
 from laburator.config import LaburatorConfig
 from laburator.pipeline import JobSearchPipeline
-from laburator.skills import build_user_messages, load_skill, response_format
+from laburator.skills import build_cv_to_tex_messages, build_proposal_messages, build_user_messages, load_skill, response_format
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,88 @@ def run(
         raise typer.Exit(1)
     finally:
         asyncio.run(pipeline.aclose())
+
+
+@app.command(name="generar-cv")
+def generar_cv(
+    proposal: str = typer.Argument(..., help="Propuesta o descripción de la oportunidad"),
+    tips: str = typer.Option(
+        "",
+        "--tips",
+        "-t",
+        help="Consejos o puntos de énfasis para el CV (qué resaltar, qué experiencia destacar)",
+    ),
+) -> None:
+    """Genera un CV adaptado a una propuesta específica (markdown + LaTeX).
+
+    Toma una propuesta (descripción de trabajo, proyecto, oportunidad) y consejos
+    del usuario, y genera un CV personalizado en markdown y LaTeX (moderncv) usando
+    tu cv.md como base.
+
+    Ejemplo:
+        laburator generar-cv "Busco desarrollador Python senior para..." --tips "Resaltar experiencia con Django y AWS"
+    """
+    config = _load_config()
+    cv_context = _read_cv(config.resolved_cv_path)
+    wiki_context = _read_wiki(config.resolved_llmwiki_dir)
+
+    # Extract personal info from cv.md for the LaTeX preamble
+    personal_info = _extract_personal_info(cv_context)
+
+    pipeline = JobSearchPipeline(config)
+
+    async def _generate_both() -> tuple[str, str]:
+        """Generate both markdown and LaTeX CVs in a single event loop."""
+        try:
+            # Step 1: Generate markdown CV
+            system_prompt = load_skill("generarcv")
+            user_messages = build_proposal_messages(proposal, tips, cv_context, wiki_context)
+
+            print("📄 Generando CV en markdown...", end=" ", flush=True)
+            cv_md = await pipeline.llm.generate(
+                system_prompt=system_prompt,
+                user_messages=user_messages,
+                response_format="text",
+            )
+            print("✓", flush=True)
+
+            # Step 2: Generate LaTeX CV from the markdown
+            system_prompt_tex = load_skill("generarcvtex")
+            user_messages_tex = build_cv_to_tex_messages(cv_md, personal_info)
+
+            print("📝 Generando CV en LaTeX...", end=" ", flush=True)
+            cv_tex = await pipeline.llm.generate(
+                system_prompt=system_prompt_tex,
+                user_messages=user_messages_tex,
+                response_format="text",
+            )
+            print("✓", flush=True)
+
+            return cv_md, cv_tex
+        finally:
+            await pipeline.aclose()
+
+    try:
+        cv_markdown, cv_latex = asyncio.run(_generate_both())
+
+        # Save both files
+        from datetime import date
+        run_date = date.today().isoformat()
+        output_dir = config.resolved_output_dir / run_date / "generar-cv"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        md_path = output_dir / "cv.md"
+        md_path.write_text(cv_markdown, encoding="utf-8")
+
+        tex_path = output_dir / "cv.tex"
+        tex_path.write_text(cv_latex, encoding="utf-8")
+
+        typer.echo(cv_markdown)
+        typer.echo(f"\n💾 Archivos guardados:", err=True)
+        typer.echo(f"   Markdown: {md_path}", err=True)
+        typer.echo(f"   LaTeX:    {tex_path}", err=True)
+    except:
+        pass
 
 
 @app.command()
@@ -333,6 +415,38 @@ def _read_wiki(wiki_dir: Path) -> str:
         except Exception:
             continue
     return "\n\n---\n\n".join(parts)
+
+
+def _extract_personal_info(cv_content: str) -> str:
+    """Extract personal info from cv.md for the LaTeX preamble.
+
+    Parses the first lines of the CV to extract name, title, contact info,
+    and professional summary.
+    """
+    lines = cv_content.strip().split("\n")
+    info_parts = []
+
+    for line in lines[:20]:  # Only look at the first 20 lines
+        line = line.strip()
+        if not line or line.startswith("---"):
+            continue
+        # Name (# Federico Gonzalez)
+        if line.startswith("# "):
+            info_parts.append(f"Name: {line[2:]}")
+        # Title (**Full-Stack Developer & DevOps**)
+        elif line.startswith("**") and line.endswith("**"):
+            info_parts.append(f"Title: {line.strip('*')}")
+        # Contact lines (contain links)
+        elif "github.com" in line or "linkedin.com" in line or "gitlab.com" in line:
+            info_parts.append(f"Contact: {line}")
+        # Quote/Summary (starts with > or is a long paragraph)
+        elif line.startswith(">") or (len(line) > 50 and not line.startswith("#")):
+            info_parts.append(f"Summary: {line.lstrip('>').strip()}")
+        # Stop at Resumen/Summary section
+        elif line.startswith("## "):
+            break
+
+    return "\n".join(info_parts) if info_parts else cv_content[:500]
 
 
 # ── Entry point ─────────────────────────────────────────────────────────
