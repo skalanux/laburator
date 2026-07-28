@@ -147,10 +147,12 @@ async def generate(request: GenerateRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+    rel_path = filepath.relative_to(config.resolved_output_dir)
     return JSONResponse(
         {
             "content": result,
             "filepath": str(filepath),
+            "rel_path": str(rel_path),
             "filename": filepath.name,
             "date": filepath.parent.parent.name,
         }
@@ -160,13 +162,11 @@ async def generate(request: GenerateRequest):
 @app.get("/api/outputs")
 async def list_outputs(limit: int = Query(20, ge=1, le=100)):
     """List recently generated output files (manual entries)."""
-    out_dir = config.resolved_output_dir / "manual"
-    if not out_dir.exists():
-        return JSONResponse({"files": []})
-
+    out_dir = config.resolved_output_dir
     files: list[dict[str, Any]] = []
-    for f in sorted(out_dir.rglob("*"), key=lambda p: p.stat().st_mtime, reverse=True):
-        if f.is_file() and f.suffix == ".md":
+    # Search for all .md files in any /manual/ subdirectory
+    for f in sorted(out_dir.rglob("**/manual/*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if f.is_file():
             rel = str(f.relative_to(config.resolved_output_dir))
             files.append(
                 {
@@ -177,14 +177,14 @@ async def list_outputs(limit: int = Query(20, ge=1, le=100)):
                     "modified": f.stat().st_mtime,
                 }
             )
-        if len(files) >= limit:
-            break
+            if len(files) >= limit:
+                break
 
     return JSONResponse({"files": files})
 
 
-@app.get("/api/file/{filepath:path}", response_class=FileResponse)
-async def serve_file(filepath: str, download: bool = Query(False)):
+@app.get("/api/file/{filepath:path}")
+async def serve_file(filepath: str, download: bool = Query(False, alias="download")):
     """Serve a file from the output directory with path safety."""
     # Resolve relative to output_dir to prevent path traversal
     resolved_path = (config.resolved_output_dir / filepath).resolve()
@@ -194,9 +194,12 @@ async def serve_file(filepath: str, download: bool = Query(False)):
     if not str(resolved_path).startswith(str(base)):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return FileResponse(
-        resolved_path, as_attachment=download, filename=resolved_path.name
-    )
+    response = FileResponse(path=resolved_path, filename=resolved_path.name)
+    if download:
+        response.headers["Content-Disposition"] = f'attachment; filename="{resolved_path.name}"'
+    else:
+        response.headers["Content-Disposition"] = f'inline; filename="{resolved_path.name}"'
+    return response
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -298,9 +301,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 result.textContent = data.content;
                 result.style.display = 'block';
                 
-                const link = document.getElementById('downloadLink');
-                link.href = '/api/file/' + encodeURIComponent(data.rel_path) + '?download=true';
-                fileLink.style.display = 'block';
+const link = document.getElementById('downloadLink');
+const fileLink = document.getElementById('fileLink');
+link.href = '/api/file/' + encodeURIComponent(data.rel_path) + '?download=true';
+fileLink.style.display = 'block';
                 document.getElementById('copied').style.display = 'none';
             } catch (e) {
                 alert('Error: ' + e.message);
