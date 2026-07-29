@@ -449,6 +449,21 @@ def _extract_personal_info(cv_content: str) -> str:
     return "\n".join(info_parts) if info_parts else cv_content[:500]
 
 
+# ── Web ──────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def web(
+    port: int = typer.Option(8080, "--port", "-p", help="Port to bind the web server."),
+):
+    """Start the Laburator web UI."""
+    import uvicorn
+
+    from laburator.web.app import app as web_app
+
+    uvicorn.run(web_app, host="0.0.0.0", port=port)
+
+
 # ── Entry point ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

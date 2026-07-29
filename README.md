@@ -158,3 +158,26 @@ laburator config
 ## Verification
 
 Run `laburator config` to confirm both keys are loaded (they'll be partially masked in the output).
+
+## Web UI
+
+Laburator includes a web interface for generating content from manual job descriptions and previewing output files.
+
+```bash
+# Start the web server
+laburator web
+```
+
+The server runs at **http://localhost:8080** by default. You can change the port with the `--port` flag:
+
+```bash
+laburator web --port 3000
+```
+
+The web UI provides:
+
+- **Generar** tab — paste a job description, optionally add a link, select a skill, and generate markdown content. Edit, save, download, or export to PDF.
+- **Mi CV** tab — view and edit your `cv.md` directly from the browser.
+- **Directorio de salida** — browse generated folders grouped by job, view file details in a modal, download files, or export to PDF.
+
+All content is generated server-side using the same skills and LLM pipeline as the CLI.
