@@ -174,6 +174,8 @@
             <textarea id="cvEditor" class="output-editor" placeholder="Escribí tu CV en markdown..."></textarea>
             <div class="action-bar">
                 <button class="btn-save" onclick="saveCv()"><i class="fa-regular fa-floppy-disk"></i> Guardar CV</button>
+                <button class="btn-outline-primary" onclick="downloadCv()"><i class="fa-solid fa-download"></i> Descargar</button>
+                <button class="btn-outline-primary" onclick="pdfCv()"><i class="fa-regular fa-file-pdf"></i> PDF</button>
                 <span id="cvStatus" class="success-msg" style="display:none;"></span>
             </div>
         </div>
@@ -232,6 +234,43 @@
             } catch (e) {
                 alert('Error al guardar CV: ' + e.message);
             }
+        }
+
+        function downloadCv() {
+            const a = document.createElement('a');
+            a.href = '/api/cv?download=true';
+            a.download = 'cv.md';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function pdfCv() {
+            const content = document.getElementById('cvEditor').value;
+            if (!content.trim()) {
+                alert('No hay contenido para generar PDF.');
+                return;
+            }
+            fetch('/api/pdf/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content }),
+            })
+                .then(r => {
+                    if (!r.ok) throw new Error('Error al generar PDF');
+                    return r.blob();
+                })
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'cv.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                })
+                .catch(err => alert('Error: ' + err.message));
         }
 
         // ── Generator ─────────────────────────────────────

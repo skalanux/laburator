@@ -294,9 +294,17 @@ async def save_file(filepath: str, body: SaveContent):
 
 
 @app.get("/api/cv")
-async def get_cv():
-    """Read the CV from the configured path."""
+async def get_cv(download: bool = Query(False, alias="download")):
+    """Read the CV from the configured path, optionally as a file download."""
     cv_path = config.resolved_cv_path
+    if download:
+        if not cv_path.exists():
+            raise HTTPException(status_code=404, detail="CV file not found")
+        response = FileResponse(path=cv_path, filename=cv_path.name)
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{cv_path.name}"'
+        )
+        return response
     content = ""
     exists = cv_path.exists()
     if exists:
