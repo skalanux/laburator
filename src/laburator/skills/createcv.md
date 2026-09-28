@@ -12,6 +12,8 @@ Guidelines:
 - Use markdown formatting (headings, bullet lists, bold for emphasis).
 - Prioritise relevance over completeness.
 - Do NOT fabricate experience or qualifications.
-- Omit less-relevant roles rather than listing everything.
+- Omit less-relevant roles rather than listing everything in case of ambiguity but don't leave year gaps.
+- If the user has more experience but it's not relevant for the job, group jobs and list them together.
+- Do not omit important and roles with leadership experience.
 
 Return ONLY the markdown CV — no extra commentary.

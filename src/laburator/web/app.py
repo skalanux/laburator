@@ -14,19 +14,19 @@ import markdown
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from weasyprint import HTML
 from pydantic import BaseModel
+from weasyprint import HTML
 
 from laburator.config import LaburatorConfig
 from laburator.llm.service import LLMService
 from laburator.skills import (
     SKILL_FILENAMES,
     SKILL_NAMES,
+    build_proposal_messages,
     build_user_messages,
     load_skill,
     response_format,
 )
-
 
 config = LaburatorConfig()
 
@@ -96,7 +96,17 @@ async def generate_skill(
         raise FileNotFoundError(f"Skill '{skill_name}' not found")
 
     # Build messages
-    user_messages = build_user_messages(skill_name, job_data, cv_context, wiki_context)
+    if skill_name == "generarcv":
+        user_messages = build_proposal_messages(
+            proposal=job_description,
+            tips="",
+            cv_context=cv_context,
+            llmwiki_context=wiki_context,
+        )
+    else:
+        user_messages = build_user_messages(
+            skill_name, job_data, cv_context, wiki_context
+        )
 
     # Call LLM
     fmt = response_format(skill_name)
