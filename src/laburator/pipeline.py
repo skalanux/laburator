@@ -14,7 +14,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
-from laburator.api.client import JobSearchClient
+from laburator.api import JobSearchAdapter, JobSearchFilters, create_search_adapter
 from laburator.config import LaburatorConfig
 from laburator.llm.service import LLMService
 from laburator.skills import (
@@ -26,6 +26,7 @@ from laburator.skills import (
     response_format,
 )
 from laburator.state import State
+from laburator.store import JobIndexStore
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +46,31 @@ class JobSearchPipeline:
     loading, LLM processing, and output saving.
     """
 
-    def __init__(self, config: LaburatorConfig) -> None:
+    def __init__(
+        self,
+        config: LaburatorConfig,
+        search_adapter: JobSearchAdapter | None = None,
+        source: str | None = None,
+    ) -> None:
         self.config = config
         self.llm = LLMService(config)
-        self.api = JobSearchClient(config.job_search_api_key)
+        self._default_source = (source or getattr(config, "job_search_source", "openninja") or "openninja")
+        if search_adapter is None:
+            try:
+                search_adapter = create_search_adapter(self._default_source, config)
+            except Exception:
+                # allow construction without credentials for non-search flows; fetch will fail explicitly
+                from laburator.api import OpenNinjaJobSearchClient
+                search_adapter = JobSearchAdapter(OpenNinjaJobSearchClient(getattr(config, "job_search_api_key", "")))
+        self.search = search_adapter
+        # Backward-compatible attribute name used internally.
+        self.api = search_adapter
+
+    def _adapter_for_source(self, source: str | None) -> JobSearchAdapter:
+        src = (source or self._default_source or getattr(self.config, "job_search_source", "openninja") or "openninja")
+        if src == self.search.source_name:
+            return self.search
+        return create_search_adapter(src, self.config)
 
     # ── Graph nodes ─────────────────────────────────────────────────────
 
@@ -63,7 +85,12 @@ class JobSearchPipeline:
             "num_pages": state.get("num_pages", 1),
             "remote_only": state.get("remote_only", False),
             "country": state.get("country", "us"),
+            "date_posted": state.get("date_posted", "all"),
+            "employment_types": state.get("employment_types", ""),
+            "page": state.get("page", 1),
+            "source": state.get("source", getattr(self.search, "source_name", "openninja")),
             "refresh": state.get("refresh", False),
+            "force": state.get("force", False),
             "run_date": run_date,
             "errors": [],
             "outputs": {},
@@ -73,29 +100,43 @@ class JobSearchPipeline:
         }
 
     async def fetch_jobs_node(self, state: State) -> dict[str, Any]:
-        """Fetch job listings from the API."""
+        """Fetch job listings from the configured search source."""
         query = state.get("query", "")
         if not query:
             return {"errors": state.get("errors", []) + ["No query provided"]}
 
-        print(f"\n🔍 Searching for '{query}'...", end=" ", flush=True)
+        src = state.get("source") or self._default_source
+        print(f"\n🔍 Searching for '{query}' ({src})...", end=" ", flush=True)
+        adapter = None
         try:
-            response = await self.api.search_v2(
+            adapter = self._adapter_for_source(src)
+            filters = JobSearchFilters(
                 query=query,
                 num_pages=state.get("num_pages", 1),
                 country=state.get("country", "us"),
-                remote_jobs_only=state.get("remote_only", False),
+                date_posted=state.get("date_posted", "all"),
+                remote_only=state.get("remote_only", False),
+                employment_types=state.get("employment_types", ""),
+                page=state.get("page", 1),
+                source=src,
             )
+            response = await adapter.search(filters)
             jobs = [job.model_dump() for job in response.data]
             print(f"{len(jobs)} job(s) found ✓", flush=True)
-            return {"all_jobs": jobs}
+            return {"all_jobs": jobs, "_search_result": response, "_search_filters": filters}
         except Exception as exc:
             print(f"failed ✗", flush=True)
             logger.exception("Failed to fetch jobs for query '%s'", query)
             return {"errors": state.get("errors", []) + [f"Fetch failed: {exc}"]}
+        finally:
+            if adapter is not None and adapter is not self.search:
+                try:
+                    await adapter.close()
+                except Exception:
+                    pass
 
     async def cache_jobs_node(self, state: State) -> dict[str, Any]:
-        """Save fetched jobs to a JSON cache file."""
+        """Save fetched jobs to legacy cache and search index."""
         jobs = state.get("all_jobs", [])
         query = state.get("query", "")
         if not jobs:
@@ -110,12 +151,23 @@ class JobSearchPipeline:
             cache_path.write_text(
                 json.dumps(jobs, indent=2, default=str), encoding="utf-8"
             )
-            print(f"✓", flush=True)
             logger.info("Cached %d jobs to %s", len(jobs), cache_path)
         except Exception as exc:
             print(f"failed: {exc}", flush=True)
             logger.warning("Failed to cache jobs: %s", exc)
+            return {}
 
+        # Persist to index when search result metadata is available
+        try:
+            result = state.get("_search_result")
+            filters = state.get("_search_filters")
+            if result is not None:
+                store = JobIndexStore(self.config.resolved_output_dir)
+                store.save_search(result, filters)
+        except Exception as exc:
+            logger.warning("Failed to save search index: %s", exc)
+
+        print(f"✓", flush=True)
         return {}  # No state mutation needed
 
     async def load_context_node(self, state: State) -> dict[str, Any]:
@@ -159,15 +211,18 @@ class JobSearchPipeline:
         }
 
     async def process_jobs_node(self, state: State) -> dict[str, Any]:
-        """Process each job through every configured skill."""
+        """Process each job through every configured skill (skips existing outputs unless force)."""
         jobs = state.get("all_jobs", [])
         cv_ctx = state.get("cv_context", "")
         wiki_ctx = state.get("llmwiki_context", "")
         errors: list[str] = list(state.get("errors", []))
         outputs: dict[str, str] = dict(state.get("outputs", {}))
+        force = bool(state.get("force", False))
+        run_date = state.get("run_date", date.today().isoformat())
 
         total = len(jobs) * len(SKILL_NAMES)
         completed = 0
+        skipped = 0
 
         for job_idx, job in enumerate(jobs):
             employer = job.get("employer_name", "unknown")
@@ -177,6 +232,19 @@ class JobSearchPipeline:
             for skill_name in SKILL_NAMES:
                 label = SKILL_LABELS.get(skill_name, skill_name)
                 completed += 1
+                out_path = self._output_path(run_date, job, skill_name)
+                existing_path = None if force else self._find_existing_output_path(job, skill_name)
+                if existing_path is not None:
+                    try:
+                        existing = existing_path.read_text(encoding="utf-8")
+                    except Exception:
+                        existing = ""
+                    output_key = f"{job_idx}_{skill_name}"
+                    outputs[output_key] = existing
+                    skipped += 1
+                    print(f"    ↷ {label} — skipped (exists: {existing_path.parent.parent.name}) ({completed}/{total})", flush=True)
+                    continue
+
                 print(f"    ⏳ {label}... ({completed}/{total})", end="", flush=True)
 
                 try:
@@ -195,15 +263,20 @@ class JobSearchPipeline:
                     print(f"\r    ✅ {label} — {len(result)} chars     ", flush=True)
 
                     # Save immediately so user can see files appear
-                    run_date = state.get("run_date", date.today().isoformat())
                     self._save_individual_output(run_date, job, skill_name, result)
 
                 except Exception as exc:
-                    print(f"\r    ❌ {label} — failed: {exc}     ", flush=True)
-                    msg = f"Skill '{skill_name}' failed for job {job_idx}: {exc}"
+                    emsg = str(exc)
+                    low = emsg.lower()
+                    if "429" in emsg or "rate" in low or "quota" in low or "too many" in low:
+                        emsg = f"rate limit/quota exceeded ({emsg})"
+                    print(f"\r    ❌ {label} — failed: {emsg}     ", flush=True)
+                    msg = f"Skill '{skill_name}' failed for job {job_idx}: {emsg}"
                     logger.exception(msg)
                     errors.append(msg)
 
+        if skipped:
+            print(f"\n  ↷ Skipped {skipped} existing output(s) (use --force-process to regenerate)", flush=True)
         return {"outputs": outputs, "errors": errors}
 
     async def save_output_node(self, state: State) -> dict[str, Any]:
@@ -237,16 +310,40 @@ class JobSearchPipeline:
 
     # ── Output helpers ──────────────────────────────────────────────────
 
-    def _save_individual_output(
-        self, run_date: str, job: dict, skill_name: str, content: str,
-    ) -> None:
-        """Write a single skill output to disk immediately."""
+    def _output_path(self, run_date: str, job: dict, skill_name: str) -> Path:
         company_slug = _slugify(job.get("employer_name", "unknown"))
         job_slug = _slugify(job.get("job_title", "unknown"))
         filename = SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
         out_dir = self.config.resolved_output_dir / run_date / f"{company_slug}-{job_slug}"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / filename
+        return out_dir / filename
+
+    def _find_existing_output_path(self, job: dict, skill_name: str) -> Path | None:
+        """Find existing output for job+skill across all run-date folders (latest first)."""
+        company_slug = _slugify(job.get("employer_name", "unknown"))
+        job_slug = _slugify(job.get("job_title", "unknown"))
+        filename = SKILL_FILENAMES.get(skill_name, skill_name) + ".md"
+        folder = f"{company_slug}-{job_slug}"
+        root = self.config.resolved_output_dir
+        if not root.is_dir():
+            return None
+        candidates: list[Path] = []
+        for date_dir in root.iterdir():
+            if not date_dir.is_dir() or date_dir.name in {"index", "cache"}:
+                continue
+            p = date_dir / folder / filename
+            if p.exists():
+                candidates.append(p)
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: (p.parent.parent.name, p.stat().st_mtime), reverse=True)
+        return candidates[0]
+
+    def _save_individual_output(
+        self, run_date: str, job: dict, skill_name: str, content: str,
+    ) -> None:
+        """Write a single skill output to disk immediately."""
+        out_path = self._output_path(run_date, job, skill_name)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             out_path.write_text(content, encoding="utf-8")
         except Exception as exc:
@@ -328,4 +425,4 @@ class JobSearchPipeline:
     async def aclose(self) -> None:
         """Release held resources."""
         await self.llm.close()
-        await self.api.close()
+        await self.search.close()

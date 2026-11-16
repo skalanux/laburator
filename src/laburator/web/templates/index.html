@@ -50,6 +50,23 @@
         .cv-status.exists { color: #16a34a; }
         .cv-status.missing { color: #dc2626;         }
 
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .job-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #fff; }
+        .job-title { font-size: 16px; font-weight: 700; color: #103a62; margin-bottom: 4px; }
+        .job-meta { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .job-desc { font-size: 13px; color: #374151; margin: 8px 0; white-space: pre-wrap; }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .pill-pending { background: #e5e7eb; color: #374151; }
+        .pill-interested { background: #dcfce7; color: #166534; }
+        .pill-rejected { background: #fee2e2; color: #991b1b; }
+        .btn-sm { padding: 6px 10px; font-size: 13px; border-radius: 6px; }
+        .btn-yes { background: #16a34a; }
+        .btn-yes:hover { background: #15803d; }
+        .btn-no { background: #dc2626; }
+        .btn-no:hover { background: #b91c1c; }
+        .btn-neutral { background: #6b7280; }
+        .btn-neutral:hover { background: #4b5563; }
+
         /* Modal */
         .modal-overlay {
             display: none;
@@ -120,7 +137,8 @@
 
     <div class="tabs">
         <button class="tab-btn active" data-tab="generator"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar</button>
-                <button class="tab-btn" data-tab="cv"><i class="fa-regular fa-file-lines"></i> Mi CV</button>
+        <button class="tab-btn" data-tab="search"><i class="fa-solid fa-magnifying-glass"></i> Buscar propuestas</button>
+        <button class="tab-btn" data-tab="cv"><i class="fa-regular fa-file-lines"></i> Mi CV</button>
     </div>
 
     <!-- ── Tab: Generator ──────────────────────────────── -->
@@ -162,6 +180,79 @@
             <div class="path" id="outputDirPath"></div>
             <ul class="file-list" id="fileList"></ul>
             <div class="pagination" id="pagination" style="margin-top: 16px; display: flex; gap: 8px; align-items: center; justify-content: center;"></div>
+        </div>
+    </div>
+
+    <!-- ── Tab: Search ─────────────────────────────────── -->
+    <div id="tab-search" class="tab-content">
+        <div class="card">
+            <h2>Buscar propuestas</h2>
+            <div class="grid-2">
+                <div>
+                    <label for="searchQuery">Búsqueda (query)</label>
+                    <input id="searchQuery" type="text" placeholder="Ej: python developer" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                </div>
+                <div>
+                    <label for="searchSource">Fuente</label>
+                    <select id="searchSource">
+                        <option value="openninja">OpenNinja (jsearch)</option>
+                        <option value="arbeitnow">Arbeitnow (gratis, sin key)</option>
+                        <option value="remotive">Remotive (remoto, sin key)</option>
+                        <option value="jobicy">Jobicy (remoto, sin key)</option>
+                        <option value="apify_linkedin">Apify LinkedIn Jobs (token, crédito $5)</option>
+                        <option value="apify_indeed">Apify Indeed Jobs (token, crédito $5)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="searchCountry">País</label>
+                    <input id="searchCountry" type="text" value="us" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                </div>
+                <div>
+                    <label for="searchPages">Páginas</label>
+                    <input id="searchPages" type="number" min="1" max="10" value="1" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                </div>
+                <div>
+                    <label for="searchDate">Fecha publicación</label>
+                    <select id="searchDate">
+                        <option value="all">Todas</option>
+                        <option value="today">Hoy</option>
+                        <option value="3days">Últimos 3 días</option>
+                        <option value="week">Última semana</option>
+                        <option value="month">Último mes</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="searchEmployment">Tipo empleo</label>
+                    <input id="searchEmployment" type="text" placeholder="fulltime,parttime,contractor" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                </div>
+            </div>
+            <label style="margin-top:8px;"><input id="searchRemote" type="checkbox"> Solo remoto</label>
+            <div class="action-bar">
+                <button id="searchBtn" onclick="runSearch()"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+                <button class="btn-secondary" onclick="loadDiscoveryJobs()"><i class="fa-solid fa-rotate"></i> Recargar guardadas</button>
+                <span id="searchStatus" class="loading" style="display:none;">Buscando...</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Propuestas</h2>
+            <div class="grid-2" style="margin-bottom:12px;">
+                <div>
+                    <label for="filterDecision">Estado</label>
+                    <select id="filterDecision" onchange="loadDiscoveryJobs()">
+                        <option value="">Todas</option>
+                        <option value="pending">Pendientes</option>
+                        <option value="interested">Me interesan</option>
+                        <option value="rejected">No me interesan</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterText">Filtrar texto</label>
+                    <input id="filterText" type="text" placeholder="título, empresa, descripción..." oninput="debouncedLoadDiscoveryJobs()" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                </div>
+            </div>
+            <div id="jobsCount" style="font-size:13px;color:#6b7280;margin-bottom:8px;"></div>
+            <div id="jobsList"></div>
         </div>
     </div>
 
@@ -491,8 +582,251 @@
         window.addEventListener('load', () => {
             loadCv();
             refreshFiles();
+            loadDiscoveryJobs();
             setInterval(refreshFiles, 5000);
         });
+
+        // ── Discovery / Search ────────────────────────────
+        let discoveryDebounce = null;
+        function debouncedLoadDiscoveryJobs() {
+            clearTimeout(discoveryDebounce);
+            discoveryDebounce = setTimeout(loadDiscoveryJobs, 300);
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        async function runSearch() {
+            const btn = document.getElementById('searchBtn');
+            const status = document.getElementById('searchStatus');
+            const query = document.getElementById('searchQuery').value.trim();
+            if (!query) { alert('Ingresá una búsqueda.'); return; }
+            btn.disabled = true; status.style.display = 'inline';
+            try {
+                const body = {
+                    query: query,
+                    source: document.getElementById('searchSource').value,
+                    country: document.getElementById('searchCountry').value.trim() || 'us',
+                    num_pages: parseInt(document.getElementById('searchPages').value || '1', 10),
+                    date_posted: document.getElementById('searchDate').value,
+                    employment_types: document.getElementById('searchEmployment').value.trim(),
+                    remote_only: document.getElementById('searchRemote').checked,
+                };
+                const res = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+                renderJobs(data.jobs || []);
+                document.getElementById('jobsCount').textContent = `${(data.jobs||[]).length} resultado(s) de la búsqueda (${data.source || ''})`;
+            } catch (e) {
+                alert('Error en búsqueda: ' + e.message);
+            } finally {
+                btn.disabled = false; status.style.display = 'none';
+            }
+        }
+
+        async function loadDiscoveryJobs() {
+            const decision = document.getElementById('filterDecision') ? document.getElementById('filterDecision').value : '';
+            const q = document.getElementById('filterText') ? document.getElementById('filterText').value.trim() : '';
+            const params = new URLSearchParams();
+            if (decision) params.set('decision', decision);
+            if (q) params.set('q', q);
+            try {
+                const res = await fetch('/api/discovery/jobs?' + params.toString());
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error');
+                renderJobs(data.jobs || []);
+                document.getElementById('jobsCount').textContent = `${(data.jobs||[]).length} propuesta(s) guardadas`;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function decisionPill(dec) {
+            if (dec === 'interested') return '<span class="pill pill-interested">Me interesa</span>';
+            if (dec === 'rejected') return '<span class="pill pill-rejected">No me interesa</span>';
+            return '<span class="pill pill-pending">Pendiente</span>';
+        }
+
+        function skillLabel(skill) {
+            const map = {jobsynthesis:'Análisis', createcv:'CV', presentationletter:'Carta', interviewquestions:'Entrevista'};
+            return map[skill] || skill;
+        }
+
+        function renderExistingOutputs(existing) {
+            const list = Array.isArray(existing) ? existing : [];
+            if (!list.length) return '<span style="color:#9ca3af;font-size:12px;">Sin salidas guardadas</span>';
+            return '<span style="font-size:12px;color:#374151;">Salidas: </span>' + list.map(s => `<span class="badge" title="Ya existe salida guardada para ${esc(skillLabel(s))}">${esc(skillLabel(s))} ✓</span>`).join(' ');
+        }
+
+        function setJobStatus(jobKey, msg, kind) {
+            const sid = 'status-' + jobKey.replace(/[^a-zA-Z0-9_-]/g,'_');
+            const el = document.getElementById(sid);
+            if (!el) return;
+            el.style.display = msg ? 'block' : 'none';
+            el.textContent = msg || '';
+            el.style.color = kind === 'error' ? '#dc2626' : (kind === 'ok' ? '#16a34a' : '#6b7280');
+        }
+
+        function renderJobs(jobs) {
+            const list = document.getElementById('jobsList');
+            if (!list) return;
+            if (!jobs || jobs.length === 0) {
+                list.innerHTML = '<div style="color:#6b7280;padding:12px;">No hay propuestas. Hacé una búsqueda o recargá las guardadas.</div>';
+                return;
+            }
+            list.innerHTML = jobs.map(job => {
+                const key = job._job_key || job.job_id || '';
+                const safeId = String(key).replace(/[^a-zA-Z0-9_-]/g,'_');
+                const title = esc(job.job_title || 'Sin título');
+                const emp = esc(job.employer_name || 'Sin empresa');
+                const loc = esc(job.job_location || (job.job_is_remote ? 'Remoto' : ''));
+                const link = job.job_apply_link || job.job_google_link || '';
+                const desc = esc((job.job_description || '').slice(0, 350));
+                const dec = job._decision || 'pending';
+                const remote = job.job_is_remote ? '<span class="badge">Remoto</span>' : '';
+                const salary = job.job_salary ? `<span class="badge">${esc(job.job_salary)}</span>` : '';
+                const score = (job._score != null) ? `<span class="badge" title="Afinidad heurística con tu CV">Afinidad: ${esc(job._score)}</span>` : '';
+                const existing = job._existing_outputs || [];
+                const src = job._source ? `<span class="badge" title="Fuente">${esc(job._source)}</span>` : '';
+                let dupe = '';
+                if (job._dupe_group_size && job._dupe_group_size > 1) {
+                    const peers = Array.isArray(job._dupe_sources) ? job._dupe_sources.join(', ') : '';
+                    dupe = `<span class="badge" style="background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;" title="Posible duplicado (mismo título/empresa/link)${peers ? ' · también en: ' + esc(peers) : ''}">Posible duplicado${peers ? ' · ' + esc(peers) : ''}</span>`;
+                }
+                return `
+                <div class="job-card" data-key="${esc(key)}">
+                    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+                        <div>
+                            <div class="job-title">${title}</div>
+                            <div class="job-meta">${emp}${loc ? ' · ' + loc : ''} ${src} ${remote} ${salary} ${score} ${dupe}</div>
+                        </div>
+                        <div>${decisionPill(dec)}</div>
+                    </div>
+                    ${link ? `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(link)}" target="_blank"><i class="fa-solid fa-link"></i> Ver oferta</a></div>` : ''}
+                    ${desc ? `<div class="job-desc">${desc}${(job.job_description||'').length>350?'…':''}</div>` : ''}
+                    <div id="existing-${safeId}" style="margin-bottom:8px;">${renderExistingOutputs(existing)}</div>
+                    <div class="action-bar">
+                        <button class="btn-sm btn-yes" onclick="setDecision('${esc(key)}','interested')"><i class="fa-regular fa-thumbs-up"></i> Me interesa</button>
+                        <button class="btn-sm btn-no" onclick="setDecision('${esc(key)}','rejected')"><i class="fa-regular fa-thumbs-down"></i> No me interesa</button>
+                        <button class="btn-sm btn-neutral" onclick="setDecision('${esc(key)}','pending')">Pendiente</button>
+                        <button class="btn-sm btn-outline-primary" onclick="enrichFromDiscovery('${esc(key)}')" title="Traer detalles completos y guardar en índice (sin LLM)"><i class="fa-solid fa-download"></i> Enriquecer</button>
+                        <select id="skill-${safeId}" style="width:auto;padding:6px 8px;font-size:13px;">
+                            <option value="jobsynthesis">Análisis</option>
+                            <option value="createcv">CV</option>
+                            <option value="presentationletter">Carta</option>
+                            <option value="interviewquestions">Entrevista</option>
+                        </select>
+                        <label style="font-size:12px;color:#374151;display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="force-${safeId}"> Forzar regenerar</label>
+                        <button class="btn-sm btn-outline-primary" onclick="generateFromDiscovery('${esc(key)}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar</button>
+                        <button class="btn-sm btn-outline-primary" onclick="showDiscoveryDetail('${esc(key)}')"><i class="fa-regular fa-eye"></i> Detalle</button>
+                    </div>
+                    <div id="status-${safeId}" style="display:none;margin-top:6px;font-size:13px;"></div>
+                </div>`;
+            }).join('');
+        }
+
+        async function setDecision(jobKey, decision) {
+            try {
+                const res = await fetch('/api/discovery/decision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_key: jobKey, decision: decision })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error');
+                await loadDiscoveryJobs();
+            } catch (e) {
+                alert('Error al guardar decisión: ' + e.message);
+            }
+        }
+
+        async function enrichFromDiscovery(jobKey) {
+            setJobStatus(jobKey, 'Enriqueciendo detalles (sin LLM)...', 'info');
+            try {
+                const res = await fetch('/api/discovery/enrich', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_key: jobKey })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error al enriquecer');
+                setJobStatus(jobKey, 'Detalles enriquecidos y guardados en el índice.', 'ok');
+                await loadDiscoveryJobs();
+            } catch (e) {
+                setJobStatus(jobKey, 'Error al enriquecer: ' + e.message, 'error');
+            }
+        }
+
+        async function generateFromDiscovery(jobKey) {
+            const safeId = jobKey.replace(/[^a-zA-Z0-9_-]/g,'_');
+            const sel = document.getElementById('skill-' + safeId);
+            const forceEl = document.getElementById('force-' + safeId);
+            const skill = sel ? sel.value : 'jobsynthesis';
+            const force = !!(forceEl && forceEl.checked);
+            setJobStatus(jobKey, (force ? 'Regenerando' : 'Generando') + ' ' + skillLabel(skill) + ' (LLM, a pedido)...', 'info');
+            try {
+                const res = await fetch('/api/discovery/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_key: jobKey, skill: skill, force: force })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+                if (data.skipped) {
+                    setJobStatus(jobKey, 'Salida existente reutilizada (sin gastar tokens). Activá "Forzar regenerar" para volver a generar.', 'ok');
+                } else {
+                    setJobStatus(jobKey, 'Generado: ' + (data.filename || skill) + (data.rel_path ? ' → ' + data.rel_path : ''), 'ok');
+                }
+                if (Array.isArray(data.existing_outputs)) {
+                    const ex = document.getElementById('existing-' + safeId);
+                    if (ex) ex.innerHTML = renderExistingOutputs(data.existing_outputs);
+                } else {
+                    await loadDiscoveryJobs();
+                }
+                refreshFiles();
+            } catch (e) {
+                setJobStatus(jobKey, 'Error al generar: ' + e.message, 'error');
+            }
+        }
+
+        async function showDiscoveryDetail(jobKey) {
+            try {
+                const res = await fetch('/api/discovery/job/' + encodeURIComponent(jobKey));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error');
+                const job = data.job || {};
+                const existing = (job._existing_outputs || []).map(skillLabel).join(', ') || 'ninguna';
+                const dupInfo = (job._dupe_group_size && job._dupe_group_size > 1) ? `Sí (${job._dupe_group_size} en grupo${(job._dupe_sources||[]).length ? ', también en: ' + (job._dupe_sources||[]).join(', ') : ''})` : 'No';
+                const text = `Título: ${job.job_title || ''}\nEmpresa: ${job.employer_name || ''}\nUbicación: ${job.job_location || ''}\nFuente: ${job._source || ''}\nRemoto: ${job.job_is_remote ? 'Sí' : 'No'}\nSalario: ${job.job_salary || ''}\nAfinidad (heurística CV): ${job._score != null ? job._score : 'n/a'}\nLink: ${job.job_apply_link || job.job_google_link || ''}\nEstado: ${job._decision || 'pending'}\nSalidas existentes: ${existing}\nPosible duplicado: ${dupInfo}\n\nDescripción:\n${job.job_description || ''}`;
+                showFileModalFromText(job.job_title || 'Detalle', text);
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function showFileModalFromText(title, text) {
+            const modal = document.getElementById('fileModal');
+            document.getElementById('modalTitle').textContent = title;
+            const editor = document.getElementById('modalEditor');
+            const viewer = document.getElementById('modalViewer');
+            const viewerPre = viewer.querySelector('pre');
+            const saveBtn = document.getElementById('modalSaveBtn');
+            document.getElementById('modalDownloadBtn').onclick = null;
+            document.getElementById('modalPdfBtn').onclick = null;
+            editor.style.display = 'none';
+            viewer.style.display = 'block';
+            viewerPre.textContent = text;
+            saveBtn.style.display = 'none';
+            modal.classList.add('open');
+        }
+
     </script>
     <!-- ── Modal ─────────────────────────────────────────── -->
     <div class="modal-overlay" id="fileModal" onclick="if(event.target===this) closeFileModal()">

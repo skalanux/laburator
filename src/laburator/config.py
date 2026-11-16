@@ -20,8 +20,14 @@ class LaburatorConfig(BaseSettings):
     # ── API credentials ─────────────────────────────────────────────────
     model_api_key: str = ""
     model_api_endpoint: str = "https://api.opencode.ai/v1"
-    model_name: str = "deepseek-v4-flash-free"
+    model_name: str = "big-pickle"
     job_search_api_key: str = ""
+    job_search_source: str = "openninja"
+
+    # Provider-specific credentials (only required when selected as source)
+    apify_api_token: str = ""
+    apify_linkedin_actor_id: str = "bebity/linkedin-jobs-scraper"
+    apify_indeed_actor_id: str = "valig/indeed-jobs-scraper"
 
     # ── Paths ───────────────────────────────────────────────────────────
     cv_path: str = "cv.md"

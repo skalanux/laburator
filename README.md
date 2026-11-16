@@ -1,6 +1,6 @@
 # Laburator
 
-CLI job-search assistant powered by LangGraph. Fetches job listings via API, processes them through an LLM, and generates tailored CVs, cover letters, and interview questions for each position.
+CLI job-search assistant powered by LangGraph. Fetches job listings from a configurable source, lets you curate proposals, and (only when you explicitly ask) generates tailored outputs (analysis, CV, cover letter, interview Q&A) with an LLM.
 
 ## Installation
 
@@ -44,19 +44,16 @@ Copy `.env.example` to `.env` and fill in your API keys:
 cp .env.example .env
 ```
 
-### API Keys
+### API Keys & config
 
-Laburator requires two API keys. Both go in the `.env` file.
+#### LLM (for on-demand generation)
 
-#### OpenCode Zen (LLM)
+Used only when you explicitly run a generation command/action (see “Token control”).
 
-Used to generate CVs, cover letters, analysis, etc.
+1. Go to **https://opencode.ai/zen** and sign up / create an API key.
+2. Copy it into `.env` as `MODEL_API_KEY`.
 
-1. Go to **https://opencode.ai/zen** and sign up.
-2. Once logged in, create an API key from the dashboard.
-3. Copy it into `.env` as `MODEL_API_KEY`.
-
-The endpoint and model are preconfigured in `.env.example`:
+Example:
 
 ```
 MODEL_API_KEY=sk-...
@@ -64,120 +61,127 @@ MODEL_API_ENDPOINT=https://opencode.ai/zen/v1
 MODEL_NAME=deepseek-v4-flash-free
 ```
 
-#### jsearch API (job search)
+#### Job search source
 
-Used to fetch live job listings.
-
-1. Go to **https://openwebninja.com** and sign up.
-2. Subscribe to the **jsearch API** plan (free tier: 200 requests/month).
-3. Copy your API key into `.env` as `JOB_SEARCH_API_KEY`:
+Job search uses a pluggable source (default: `openninja` / jsearch). Configure via env/config:
 
 ```
+JOB_SEARCH_SOURCE=openninja
 JOB_SEARCH_API_KEY=ak_...
 ```
 
+- `JOB_SEARCH_SOURCE` selects the provider (currently `openninja` is implemented).
+- The corresponding provider credentials must be set (e.g. `JOB_SEARCH_API_KEY` for `openninja`).
+
 ### CV
 
-Create your own `cv.md` at the project root with your personal experience, skills, and education. This is used by the LLM to tailor CVs, cover letters, and interview questions for each job.
-
-A sample is provided as reference:
+Create your own `cv.md` at the project root with your personal experience, skills, and education. It is used as context when you ask to generate tailored outputs.
 
 ```bash
 cp cv.md.example cv.md   # then edit it with your own data
 ```
 
-The CV supports any markdown content — sections like Summary, Experience, Education, Skills, and Languages are all parsed and passed as context to every skill.
-
 ### LLM Wiki (optional)
 
-If you have reference knowledge — technical notes, company background, industry research — you can place `.md` files in `~/Proyectos/llmwiki/wiki/` (or the path configured as `LLMWIKI_DIR` in `.env`). These files are loaded and injected into every skill prompt as supplementary context, giving the LLM more relevant background to work with.
+If you have reference `.md` notes, place them in the configured `LLMWIKI_DIR` (default `~/Proyectos/llmwiki/wiki/`). They are injected as context for generation skills.
 
 ### Skills (custom prompts)
 
-Skills are **markdown files** containing the system prompt for each LLM call. Built-in skills ship with the package:
+Skills are markdown files containing the system prompt for each LLM call. Built-ins ship with the package (e.g. `jobsynthesis`, `createcv`, `presentationletter`, `interviewquestions`, `generarcv`, `generarcvtex`).
 
-| File | Generates |
-|------|-----------|
-| `jobsynthesis.md` | Job analysis |
-| `createcv.md` | Tailored CV |
-| `presentationletter.md` | Cover letter |
-| `interviewquestions.md` | Interview Q&A |
+To customise, add `~/.config/laburator/skills/<name>.md` with the same filename — it takes precedence over the built-in.
 
-To customise a skill, create `~/.config/laburator/skills/<name>.md` with the same filename — it will take precedence over the built-in. For example:
+## Token control (important)
 
-```bash
-mkdir -p ~/.config/laburator/skills
-# Override the CV prompt
-cp src/laburator/skills/createcv.md ~/.config/laburator/skills/
-# Now edit ~/.config/laburator/skills/createcv.md to your liking
-```
+- **No automatic AI analysis/generation.** LLM calls happen **only on explicit request** and for the **specific action/skill you select**.
+- Searching, listing, deciding, and enriching job details do **not** call the LLM.
+- To avoid wasting tokens, existing outputs are **skipped by default** (no reprocessing). Regenerate only when you explicitly ask with `--force` / `--force-process` / `force: true`.
 
-Every skill call receives the job listing (JSON), your CV, and the wiki knowledge base as context automatically.
+## v2 flow
 
-## Output
+1. **Search** proposals (fetch + cache/index) — no LLM.
+2. **Curate**: review and mark each job as `interested` / `rejected` / `pending` (stored in the index).
+3. **Enrich on demand** (optional): fetch full `job_details` for a specific job and merge into the index — no LLM.
+4. **Generate on demand** (LLM): run selected skills for selected jobs only (single job or batch of `interested`), skipping existing outputs unless forced.
 
-Results are saved under `~/.local/share/laburator/output/`, organized by date:
-
-```
-~/.local/share/laburator/output/
-├── cache/                          # cached job listings (JSON)
-│   └── python-developer/
-│       └── jobs.json
-└── 2026-06-19/                     # one folder per run date
-    ├── ait-python-developer/       # one folder per job
-    │   ├── job.md                  #   job analysis (skills, summary)
-    │   ├── cv.md                   #   tailored CV
-    │   ├── presentation.md         #   cover letter
-    │   └── interview.md            #   interview questions
-    ├── randstad-usa-senior-full-stack-python-developer/
-    │   └── ...
-    └── ...
-```
-
-Files appear in real time as each skill completes — you don't have to wait for the full pipeline to finish.
-
-## Usage
+## CLI usage
 
 ```bash
-# Search for jobs (fetch-only, no LLM calls)
-laburator search "python developer" --pages 1 --remote
+# Configuration (keys masked)
+laburator config
 
-# Run the full pipeline: fetch + LLM analysis + output files
-laburator synth "python developer" --pages 1 --remote
+# Search and index/cache jobs (fetch-only, no LLM)
+laburator search "python developer" \
+  --pages 1 --remote --country us \
+  --date-posted all --employment-types "" --page 1 \
+  --source openninja
 
-# List cached searches
+# List indexed searches/jobs and legacy cache
 laburator list
 
-# Run a single skill on a cached job
-laburator run <job-id> --skill createcv
+# Curate a job by job_id or indexed job_key
+laburator decide <job_id|job_key> interested
+laburator decide <job_id|job_key> rejected
+laburator decide <job_id|job_key> pending --notes "optional"
 
-# Show configuration
-laburator config
+# Enrich a job with full details on demand (no LLM)
+laburator enrich <job_id|job_key> --source openninja
+
+# Run a single skill on a specific job (job_id or job_key) — LLM, on demand
+laburator run <job_id|job_key> --skill createcv
+
+# Generate tailored CV (md + tex) for a specific proposal — LLM, on demand
+laburator generar-cv <job_id|job_key>
+
+# Batch: process ONLY interested jobs, ONLY selected skills — LLM, on demand
+# (repeat --skill; existing outputs are skipped unless --force)
+laburator process-interested --skill createcv --skill presentationletter
+laburator process-interested --skill jobsynthesis --force
+
+# Full pipeline fetch + generate for a query — LLM, on demand (runs configured skills)
+# skips existing outputs unless --force-process; re-fetch with --refresh
+laburator synth "python developer" --pages 1 --remote --force-process
 ```
 
-## Verification
-
-Run `laburator config` to confirm both keys are loaded (they'll be partially masked in the output).
+Notes:
+- `--source` / `JOB_SEARCH_SOURCE` select the search provider (effective in CLI/pipeline/web).
+- `process-interested` and `synth` skip existing outputs by default to avoid token waste; use `--force` / `--force-process` to regenerate.
 
 ## Web UI
 
-Laburator includes a web interface for generating content from manual job descriptions and previewing output files.
+Start the web server:
 
 ```bash
-# Start the web server
-laburator web
-```
-
-The server runs at **http://localhost:8080** by default. You can change the port with the `--port` flag:
-
-```bash
+laburator web            # http://localhost:8080
 laburator web --port 3000
 ```
 
-The web UI provides:
+The web UI includes:
+- **Buscar propuestas** — search by source/filters, review results, mark `interested` / `rejected` / `pending`, enrich job details on demand, and trigger generation for a selected job+skill **only when you ask** (skips existing output unless forced).
+- **Generar** — generate content from a manual job description for a selected skill (on demand).
+- **Mi CV** — view/edit `cv.md`.
+- **Directorio de salida** — browse generated outputs, view/download/export to PDF.
 
-- **Generar** tab — paste a job description, optionally add a link, select a skill, and generate markdown content. Edit, save, download, or export to PDF.
-- **Mi CV** tab — view and edit your `cv.md` directly from the browser.
-- **Directorio de salida** — browse generated folders grouped by job, view file details in a modal, download files, or export to PDF.
+## Output
 
-All content is generated server-side using the same skills and LLM pipeline as the CLI.
+Results are saved under `~/.local/share/laburator/output/` (configurable):
+
+```
+~/.local/share/laburator/output/
+├── index/                          # v2 search index and decisions
+│   ├── searches/*.json
+│   └── decisions.json
+├── cache/                          # legacy-compatible cached listings
+│   └── <query-slug>/jobs.json
+└── <YYYY-MM-DD>/                   # outputs per run date (on-demand generation)
+    └── <company-job>/              # per job
+        ├── job.md
+        ├── <skill>.md              # generated outputs
+        └── ...
+```
+
+Generation skips existing outputs by default; regeneration happens only with explicit force.
+
+## Verification
+
+Run `laburator config` to confirm configured source/model/keys (keys partially masked) and paths.

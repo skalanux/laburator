@@ -492,7 +492,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "langgraph", specifier = ">=0.2" },
     { name = "markdown", specifier = ">=3.10" },
-    { name = "markdown", specifier = ">=3.10.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "python-multipart", specifier = ">=0.0.32" },

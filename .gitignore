@@ -7,3 +7,7 @@ dist/
 jobs/
 *.json
 build/
+cv.*
+.atl/
+*.tex
+

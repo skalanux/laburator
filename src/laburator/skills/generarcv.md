@@ -16,23 +16,28 @@ Produce a CV optimised for THIS proposal by reordering, emphasising, and rewordi
 
 ### Output structure
 
-- **Name** and **contact information** (from the base CV). Include the portfolio link (GitHub, personal website, Behance, etc.) if available in the user's CV or knowledge base.
+- **Name**, **portfolio** and **contact information** (from the base CV). Include the portfolio link (GitHub, personal website, Behance, etc.) if available in the user's CV or knowledge base.
 - **Professional summary**: 2-3 sentences tailored to the proposal, using the user's tips as guidance.
 - **Relevant experience**: max 4 roles, reordering and emphasising achievements that match the proposal. Use the user's tips to decide which roles matter most.
 - **Key skills**: a concise bullet list aligned with the proposal's requirements. Prioritise the skills the user asked to highlight.
-- **Languages**: list languages and proficiency levels (e.g., Native, Fluent / C2, Advanced / C1, Intermediate / B2, Basic / A2) based on the user's CV or knowledge base. If no language data is available, infer from the user's background.
-- **Education**: brief listing of degrees and certifications.
+- **Languages**: list languages to speak (spanish, english, etc.) and proficiency levels (e.g., Native, Fluent / C2, Advanced / C1, Intermediate / B2, Basic / A2) based on the user's CV or knowledge base. If no language data is available, infer from the user's background.
+- **Education**: brief listing of degrees and certifications and translate into the proposal's language.
 
 ### Critical rules
 
 - **NEVER mention the proposal's company, project, or organisation name anywhere in the CV.** The CV must present the candidate as a standalone professional document — not as an application letter. No "seeking a position at X", no "I am excited to join Y". Write it as if it will be submitted to multiple companies.
-- **Include a portfolio link** (GitHub, personal website, etc.) in the contact section if available in the user's CV or knowledge base. If none is found, omit it.
+- **Include a portfolio link** (GitHub, personal website, etc.) before the contact section if available in the user's CV or knowledge base as [Portfolio](URL). If none is found, omit it.
+- **NEVER omit then current role** — it must always be included.
+- All the links in the CV must be clickable and functional.
 - Keep it to ONE page (~4000 characters max).
 - Use markdown formatting (headings, bullet lists, bold for emphasis).
 - Prioritise relevance over completeness — reorder roles, trim irrelevant ones.
 - Do NOT fabricate experience or qualifications.
 - Follow the user's tips as the primary signal for what to emphasise.
 - If the proposal is in English, write the CV in English. If in Spanish, write it in Spanish. Match the proposal's language.
+- Format dates consistently (MM/YYYY or Month YYYY) and use the same format throughout the CV.
+- Format skills in a concise bullet list, not a table.
+- Remove blank spaces at the end of lines and trailing whitespace.
 
 ---
 
@@ -70,7 +75,7 @@ Verify the draft passes ALL of these:
 
 | Check | Requirement |
 | ------- | ------------ |
-| Section headers | Use standard names: Professional Summary, Professional Experience / Work Experience, Education, Skills, Languages |
+| Section headers | Use standard names: Professional Summary, Professional Experience / Work Experience, Education, Skills, Languages (e.g., Spanish - Native, English - Fluent) |
 | Tables/columns | NONE — use plain text and markdown lists only |
 | Contact info | In the body, NOT in a header or footer |
 | Date format | Consistent: MM/YYYY or Month YYYY throughout |
